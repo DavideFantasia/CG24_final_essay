@@ -31,8 +31,7 @@ struct gltf_loader {
 		bool ret = false;
 		if (ext.compare("glb") == 0) {
 			// assume binary glTF.
-			ret =
-				loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
+			ret = loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
 		}
 		else {
 			// assume ascii glTF.
@@ -140,8 +139,7 @@ struct gltf_loader {
 					}
 				}
 
-				const tinygltf::Accessor& indexAccessor =
-					model.accessors[primitive.indices];
+				const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
 
 				int mode = -1;
 				if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
@@ -167,8 +165,7 @@ struct gltf_loader {
 				}
 
 				// Compute byteStride from Accessor + BufferView combination.
-				int byteStride =
-					indexAccessor.ByteStride(model.bufferViews[indexAccessor.bufferView]);
+				int byteStride = indexAccessor.ByteStride(model.bufferViews[indexAccessor.bufferView]);
 				assert(byteStride != -1);
 
 				// one long texture, just a stub implementation
