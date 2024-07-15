@@ -2,7 +2,7 @@
 
 // Constructor with vectors
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(2.5f), MouseSensitivity(0.075f), Zoom(45.0f) {
+    :Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(2.0f), MouseSensitivity(0.075f), Zoom(45.0f) {
     Position = position;
     WorldUp = up;
     Yaw = yaw;
@@ -18,24 +18,6 @@ glm::mat4 Camera::GetViewMatrix() {
 void Camera::SwitchPosition(glm::vec3 newPosition){
     Position = newPosition;
     updateCameraVectors();
-}
-
-float Camera::TerrainHeight(float x, float z) {
-    /*
-    int mapped_x = static_cast<int>((x + 1.f) / 2.0f * (heightmap.x_size - 1));
-    int mapped_z = static_cast<int>((z + 1.f) / 2.0f * (heightmap.y_size - 1));
-
-    if (mapped_x < 0) mapped_x = 0;
-    if (mapped_z < 0) mapped_z = 0;
-
-    if (mapped_x >= heightmap.x_size) mapped_x = heightmap.x_size;
-    if (mapped_z >= heightmap.y_size) mapped_z = heightmap.y_size;
-
-    int index = (mapped_z * heightmap.x_size + mapped_x) * heightmap.n_components;
-
-    return heightmap.pixelData[index] / 255.f;
-    */
-    return 1.f;
 }
 
 // Processes input received from any keyboard-like input system
@@ -55,7 +37,7 @@ void Camera::ProcessKeyboard(CameraMovement direction, float deltaTime) {
         Position -= Up * velocity;
 
     // Imposta la posizione Y della camera sulla superficie del terreno
-    Position.y = TerrainHeight(Position.x, Position.z);
+    Position.y = 0.5f;
 
     // Aggiorna i vettori della camera
     updateCameraVectors();

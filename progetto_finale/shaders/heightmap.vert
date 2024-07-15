@@ -15,17 +15,16 @@ uniform mat4 uModel;
 
 uniform sampler2D uColorImage;
 uniform float uHeightScale;
+uniform float uTextureRep;
 
 void main(void)
 {
-    float textureRep = 4;
-    float duneScale = 0.25;
-    float height = texture2D(uColorImage,aTexCoord*textureRep).r * duneScale;
+    float height = texture2D(uColorImage,aTexCoord*uTextureRep).r * uHeightScale;
     vec3 newPosition = vec3(aPosition.x, aPosition.y+height, aPosition.z);
 
     vTexCoord = aTexCoord;
     vColor = aColor;
-	vPos = (uView * uModel*vec4(newPosition, 1.0)).xyz;
+	vPos = vec3((uModel*vec4(newPosition, 1.0)));
 
     gl_Position = uProj * uView * uModel * vec4(newPosition, 1.0);
 }

@@ -6,18 +6,142 @@ in vec2 vTexCoord;
 in vec3 vColor; 
 in vec3 vPos; 
 
-uniform sampler2D uSandTexture;
+struct DirLight {
+	vec3 direction;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+};
+uniform DirLight dirLight;
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir);
+
+struct PointLight {
+	vec3 position;
+
+	float constant;
+	float linear;
+	float quadratic;
+
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+};
+uniform PointLight pointLight;
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+
+struct SpotLight{
+	vec3 position;
+	vec3 direction;
+
+	float constant;
+	float linear;
+	float quadratic;
+
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+
+	float cutOff;
+	float outerCutOff;
+};
+uniform SpotLight spotlight;
+vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+
+//struct per i materiali
+struct Material {
+	sampler2D diffuse_map;
+
+	vec3 specular;
+	float shininess;
+};
+
+uniform Material material;
+uniform vec3 uViewPos;
 
 void main(void) 
 { 
-   // this part uses concept we haven't covered yet. Please ignore it
-   vec3 N = normalize(cross(dFdx(vPos),dFdy(vPos)));
-   vec3 L0 = normalize(vec3(2,2,0)-vPos);
-   vec3 L1 = normalize(vec3(-2,1,0)-vPos);
-   float contrib = (max(0.f,dot(N,L0))+max(0.f,dot(N,L1)))*0.5;
+	float gamma = 2.2;
+	vec3 viewDir = normalize(uViewPos - vPos);
+	vec3 norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
 
-   vec3 fixedColor = vec3(237.0 / 255.0, 211.0 / 255.0, 140.0 / 255.0);
-   //color = vec4(fixedColor*contrib, 1.0); 
-   vec3 texColor = texture2D(uSandTexture,vTexCoord).rgb;
-   color = vec4(texColor*contrib,1.0);
+	vec3 result = vec3(CalcSpotLight(spotlight, norm, vPos, viewDir));
+	result = pow(result,vec3(1.0/gamma));
+
+	color = vec4(result, 1.0);
 } 
+
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
+	vec3 lightDir = normalize(-light.direction);
+	vec3 halfwayDir = normalize(lightDir + viewDir);
+
+	// diffuse shading
+	float diff = max(dot(normal, lightDir), 0.0);
+	// specular shading
+	float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
+
+	// combine results
+	vec3 diffuseFactor = vec3(texture(material.diffuse_map, vTexCoord));
+	vec3 ambient = light.ambient * diffuseFactor;
+	vec3 diffuse = light.diffuse * diff * diffuseFactor;
+	vec3 specular = light.specular * spec * material.specular;
+	return (ambient + diffuse + specular);
+}
+
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
+	vec3 lightDir = normalize(light.position - fragPos);
+	vec3 halfwayDir = normalize(lightDir + viewDir);
+
+	// diffuse shading
+	float diff = max(dot(normal, lightDir), 0.0);
+	// specular shading
+	float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
+	
+	// attenuation
+	float distance = length(light.position - fragPos);
+	float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));
+	
+	// combine results
+	vec3 diffuseFactor = vec3(texture(material.diffuse_map, vTexCoord));
+	vec3 ambient = light.ambient * diffuseFactor;
+	vec3 diffuse = light.diffuse * diff * diffuseFactor;
+	vec3 specular = light.specular * spec * material.specular;
+
+	ambient *= attenuation;
+	diffuse *= attenuation;
+	specular *= attenuation;
+	return (ambient + diffuse + specular);
+}
+
+vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
+	vec3 lightDir = normalize(light.position - fragPos);
+	vec3 halfwayDir = normalize(lightDir + viewDir);
+
+	// diffuse shading
+	float diff = max(dot(normal, lightDir), 0.0);
+	// specular shading
+	float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
+	
+	// attenuation
+	float distance = length(light.position - fragPos);
+	float attenuation = 1.0 / (light.constant + light.linear * distance +
+	light.quadratic * (distance * distance));
+	
+	// combine results
+	vec3 diffuseFactor = vec3(texture(material.diffuse_map, vTexCoord));
+	vec3 ambient = light.ambient * diffuseFactor;
+	vec3 diffuse = light.diffuse * diff * diffuseFactor;
+	vec3 specular = light.specular * spec * material.specular;
+	
+	// soft-shading of the border
+	float theta = dot(lightDir, normalize(-light.direction));
+	float epsilon = light.cutOff - light.outerCutOff;
+	float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
+
+	diffuse *= intensity;
+	specular *= intensity;
+
+	ambient *= attenuation;
+	diffuse *= attenuation;
+	specular *= attenuation;
+	return (ambient + diffuse + specular);
+}
