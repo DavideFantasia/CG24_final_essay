@@ -1,3 +1,4 @@
+
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <GL/glew.h>
@@ -16,6 +17,7 @@
 #include "..\common\simple_shapes.h"
 #include "..\common\matrix_stack.h"
 #include "..\common\intersection.h"
+#include "..\common\frame_buffer_object.h"
 
 
 //gestione delle texture
@@ -74,7 +76,7 @@ glm::mat4 proj;
 glm::mat4 view;
 
 /* program shaders used */
-shader heightmap_shader, skybox_shader;
+shader heightmap_shader, skybox_shader, fsq_shader, depth_shader;
 float heightmapScale = 0.25f; //scale of the dune height (heightmap scale value)
 float heightmapRep = 4.f; //repetition of the heightmap on the heightmap
 
@@ -82,11 +84,31 @@ float heightmapRep = 4.f; //repetition of the heightmap on the heightmap
 renderable r_terrain;
 // cubo che funge da cubemap
 renderable r_cube;
+// quad da renderizzare a schermo intero a scopo di debug per le texture
+renderable r_quad;
+
 void draw_large_cube() {
 	r_cube = shape_maker::cube();
 	r_cube.bind();
 	glUniformMatrix4fv(skybox_shader["uModel"], 1, GL_FALSE, &glm::scale(glm::mat4(1.f), glm::vec3(10.0, 10.0, 10.0))[0][0]);
 	glDrawElements(r_cube().mode, r_cube().count, r_cube().itype, 0);
+}
+
+void draw_full_screen_quad() {
+	r_quad.bind();
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
+
+void draw_texture(GLint tex_id) {
+	GLint at;
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &at);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, tex_id);
+	glUseProgram(fsq_shader.program);
+	glUniform1i(fsq_shader["uTexture"], 0);
+	draw_full_screen_quad();
+	glUseProgram(0);
+	glActiveTexture(at);
 }
 
 /* callback function called when the windows is resized */
@@ -108,16 +130,44 @@ texture heightmap, sandTexture;
 char heightmap_name[256] = { "./textures/terrain/height_map_blurred.png" };
 char sandTexture_name[256] = { "./textures/terrain/sand_texture.jpg" };
 /*-------- skybox texture ----------*/
-texture skybox, reflection_map;
+texture skybox;
 /*
 * id 0: heightmap terrain
 * id 1: desert texture terrain
 * id 2: skybox
+* id 3: shadowmap, con scopo di shadow mapping
 */
-void load_textures() {
-	heightmap.load(std::string(heightmap_name), 0,false);
-	sandTexture.load(std::string(sandTexture_name), 1,true);
+/* ---- framebuffer object for shadowmapping ----*/
+frame_buffer_object depthBuffer;
 
+/* projector */
+float depth_bias;
+float distance_light;
+
+struct projector {
+	glm::mat4 view_matrix, proj_matrix;
+	texture tex;
+	glm::mat4 set_projection(glm::mat4 _view_matrix) {
+		view_matrix = _view_matrix;
+
+		//TBD: set the view volume properly so that they are a close fit of the bunding box passed as parameter
+		proj_matrix = glm::ortho(-4.f, 4.f, -4.f, 4.f, 0.f, distance_light * 2.f);
+		//		proj_matrix = glm::perspective(3.14f/2.f,1.0f,0.1f, distance_light*2.f);
+		return proj_matrix;
+	}
+	glm::mat4 light_matrix() {
+		return proj_matrix * view_matrix;
+	}
+	// size of the shadow map in texels
+	int sm_size_x, sm_size_y;
+};
+projector Lproj;
+
+
+void load_textures() {
+	heightmap.load(std::string(heightmap_name), 0, false);
+	sandTexture.load(std::string(sandTexture_name), 1, true);
+	
 	std::string path = "./textures/cube_map/HD/";
 	skybox.load_cubemap(path + "posx.png", path + "negx.png",
 		path + "posy.png", path + "negy.png",
@@ -166,6 +216,13 @@ int main(void)
 	std::string shaders_path = "./shaders/";
 	heightmap_shader.create_program((shaders_path + "heightmap.vert").c_str(), (shaders_path + "heightmap.frag").c_str());
 	skybox_shader.create_program((shaders_path + "skybox.vert").c_str(), (shaders_path + "skybox.frag").c_str());
+	fsq_shader.create_program((shaders_path + "fsq.vert").c_str(), (shaders_path + "fsq.frag").c_str());
+	depth_shader.create_program((shaders_path + "depthShader.vert").c_str(), (shaders_path + "depthShader.frag").c_str());
+
+	validate_shader_program(heightmap_shader.program);
+	validate_shader_program(skybox_shader.program);
+	validate_shader_program(fsq_shader.program);
+	validate_shader_program(depth_shader.program);
 
 	/* Set the uT matrix to Identity */
 	glUseProgram(heightmap_shader.program);
@@ -182,11 +239,17 @@ int main(void)
 
 	//matrice di modello del terreno
 	glm::mat4 model_matrix = glm::scale(glm::mat4(1.f), glm::vec3(3.f, 1.f, 3.f));
-	
+
 	/* Transformation to setup the point of view on the scene */
 	proj = glm::perspective(glm::radians(40.f), width / float(height), 1.f, 10.f);
 	view = camera.GetViewMatrix();
 
+	/* ------------ light projection ------------ */
+
+	Lproj.sm_size_x = 2048;
+	Lproj.sm_size_y = 2048;
+	depth_bias = 0.005f;
+	distance_light = 5;
 
 	/* ----------- Passaggio Uniform per la creazione del Terrain ----------------*/
 	glUseProgram(heightmap_shader.program);
@@ -195,52 +258,48 @@ int main(void)
 
 	/*-------- Passaggio ID delle texture alla Shader ----------*/
 	glUniform1i(heightmap_shader["uColorImage"], 0);
-	
-	GLint numUniforms;
-	glGetProgramiv(heightmap_shader.program, GL_ACTIVE_UNIFORMS, &numUniforms);
-	for (int i = 0; i < numUniforms; ++i) {
-		GLint length;
-		GLenum type;
-		GLchar name[256];
-		glGetActiveUniform(heightmap_shader.program, i, 256, &length, NULL, &type, name);
-		std::cout << "Active Uniform #" << i << ": " << name << std::endl;
-	}
 
 	Light lampadina;
 	//lampadina.init_bulb(glm::vec3(1.f, 3.f, 1.f));
-	//lampadina.init_directional(glm::vec3(1.f, 5.f, -1.f);
-	lampadina.init_spotLight(glm::vec3(1.f, 2.f, 1.f), glm::vec3(-0.5f, -1.f, -1.f), 50.f, 25.f);
+	lampadina.init_directional(glm::vec3(0.75f, 3.f, -2.f));
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.direction"), 1, glm::value_ptr(lampadina.direction));
 
 	lampadina.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
 	lampadina.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
 	lampadina.specular = glm::vec3(0.65f, 0.65f, 0.65f);
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.ambient"), 1, glm::value_ptr(lampadina.ambient));
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.diffuse"), 1, glm::value_ptr(lampadina.diffuse));
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.specular"), 1, glm::value_ptr(lampadina.specular));
+
+
+	/*
+	lampadina.init_spotLight(glm::vec3(1.f, 2.f, 1.f), glm::vec3(-0.5f, -1.f, -1.f), 50.f, 25.f);
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.position"), 1, glm::value_ptr(lampadina.position));
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.direction"), 1, glm::value_ptr(lampadina.direction));
+
+	lampadina.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+	lampadina.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+	lampadina.specular = glm::vec3(0.65f, 0.65f, 0.65f);
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.ambient"), 1, glm::value_ptr(lampadina.ambient));
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.diffuse"), 1, glm::value_ptr(lampadina.diffuse));
+	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.specular"), 1, glm::value_ptr(lampadina.specular));
 
 	// Valori di attenuazione per la luce spot
 	lampadina.constant = 1.0f;
 	lampadina.linear = 0.09f;
 	lampadina.quadratic = 0.032f;
-
-	// Angoli per la luce spot
-	lampadina.cutOff = glm::cos(glm::radians(12.5f));
-	lampadina.outerCutOff = glm::cos(glm::radians(15.0f));
-
-	//passaggio info sulla luce
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.cutOff"), lampadina.cutOff);
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.outerCutOff"), lampadina.outerCutOff);
-
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.position"), 1, glm::value_ptr(lampadina.position));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.direction"), 1, glm::value_ptr(lampadina.direction));
-
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.ambient"), 1, glm::value_ptr(lampadina.ambient));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.diffuse"), 1, glm::value_ptr(lampadina.diffuse));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.specular"), 1, glm::value_ptr(lampadina.specular));
-
 	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.constant"), lampadina.constant);
 	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.linear"), lampadina.linear);
 	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.quadratic"), lampadina.quadratic);
 	
-	
+	// Angoli per la luce spot
+	lampadina.cutOff = glm::cos(glm::radians(12.5f));
+	lampadina.outerCutOff = glm::cos(glm::radians(15.0f));
+	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.cutOff"), lampadina.cutOff);
+	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.outerCutOff"), lampadina.outerCutOff);
+	*/
 	glUniform3fv(heightmap_shader["uViewPos"], 1, &camera.Position[0]);
+	glUniform1f(heightmap_shader["uBias"], depth_bias);
 	/*
 	glUseProgram(0);
 	check_gl_errors(__LINE__, __FILE__, true);
@@ -249,7 +308,6 @@ int main(void)
 	/* -------- Passaggio Uniform alla Texture Shader ------------*/
 	glUseProgram(skybox_shader.program);
 	glUniform1i(skybox_shader["uSkybox"], 2);
-	//glUniform1i(texture_shader["uReflectionMap"], 3);
 	glUniformMatrix4fv(skybox_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
 	glUniformMatrix4fv(skybox_shader["uView"], 1, GL_FALSE, &view[0][0]);
 	glUseProgram(0);
@@ -259,8 +317,6 @@ int main(void)
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	check_gl_errors(__LINE__, __FILE__, true);
 
-	/* define the viewport  */
-	glViewport(0, 0, width, height);
 
 	load_textures();
 
@@ -269,45 +325,74 @@ int main(void)
 	/*---- attesa fine generazione del terreno -----*/
 	terraingeneration_thread.join();
 	s_plane.to_renderable(r_terrain);
+	r_quad = shape_maker::quad();
 
-	//framebuffer per lo shadowmapping
-	unsigned int depthMapFBO;
-	glGenFramebuffers(1, &depthMapFBO);
-	texture depthmapTexture;
-	depthmapTexture.createDepthMap(1024,1024);
-	//attacchiamo la texture al framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,depthmapTexture.id, 0);
-	glDrawBuffer(GL_NONE); //per dire a GL che non vogliamo colorare nulla
-	glReadBuffer(GL_NONE); //e quindi non ci serve il color buffer
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	
+	Lproj.view_matrix = glm::lookAt(lampadina.position, lampadina.direction, glm::vec3(0.f, 0.f, 1.f));
+	
+	depthBuffer.create(Lproj.sm_size_x, Lproj.sm_size_y, true);
 
 	/* ------------------ RENDER LOOP ---------------------------*/
 	while (!glfwWindowShouldClose(window))
 	{
+		/* Render here */
+		glClearColor(0.8f, 0.8f, 0.9f, 1.f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+		//deph mapping
+		
+		glUseProgram(depth_shader.program);
+
+		Lproj.set_projection(Lproj.view_matrix);
+		glUniformMatrix4fv(depth_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(Lproj.light_matrix())[0][0]);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, depthBuffer.id_fbo);
+		glViewport(0, 0, Lproj.sm_size_x, Lproj.sm_size_y);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+			glCullFace(GL_FRONT); //per sistemare il peter-panning
+			// -------- render scene
+			glUniformMatrix4fv(depth_shader["uModel"], 1, GL_FALSE, &model_matrix[0][0]);
+			r_terrain.bind();
+			glDrawElements(r_terrain().mode, r_terrain().count, r_terrain().itype, 0);
+
+
+			glUniformMatrix4fv(depth_shader["uModel"], 1, GL_FALSE, &(glm::scale(glm::mat4(1.f), glm::vec3(0.5f, 0.5f, 0.5f)))[0][0]);
+			r_cube.bind();
+			glDrawElements(r_cube().mode, r_cube().count, r_cube().itype, 0);
+			// ------
+			glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glUseProgram(0);
+		// ripristino del frame buffer attivo
+
+		/*-----------------------------------------------------------------------------*/
 
 		glViewport(0, 0, width, height);
 		// Per-frame time logic
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-
-		/* Render here */
-		glClearColor(0.8f, 0.8f, 0.9f, 1.f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-
+		
 		// Input
 		processInput(window);
 		view = camera.GetViewMatrix();
 
-		/*Terrain Rendering*/
+		//Terrain Rendering
 		glUseProgram(heightmap_shader.program);
 		glUniformMatrix4fv(heightmap_shader["uView"], 1, GL_FALSE, &view[0][0]);
 		glUniformMatrix4fv(heightmap_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
 		glUniformMatrix4fv(heightmap_shader["uModel"], 1, GL_FALSE, &model_matrix[0][0]);
 		glUniform3fv(heightmap_shader["uViewPos"], 1, &camera.Position[0]);
+		//shadowmapping
+		glUniformMatrix4fv(heightmap_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(Lproj.light_matrix())[0][0]);
+
+		GLint at;
+		glGetIntegerv(GL_ACTIVE_TEXTURE, &at);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, depthBuffer.id_depth);
+		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uShadowMap"), 3);
+		glActiveTexture(at);
 
 		//passaggio info per il materiale
 		glUniform1i(glGetUniformLocation(heightmap_shader.program, "material.diffuse_map"), 1);
@@ -318,7 +403,7 @@ int main(void)
 		glDrawElements(r_terrain().mode, r_terrain().count, r_terrain().itype, 0);
 
 		//disegno del cubo
-		glUniformMatrix4fv(heightmap_shader["uModel"], 1, GL_FALSE, &(glm::scale(glm::mat4(1.f),glm::vec3(0.5f,0.5f,0.5f)))[0][0]);
+		glUniformMatrix4fv(heightmap_shader["uModel"], 1, GL_FALSE, &(glm::scale(glm::mat4(1.f), glm::vec3(0.5f, 0.5f, 0.5f)))[0][0]);
 		glUniform1i(glGetUniformLocation(heightmap_shader.program, "material.diffuse_map"), 1);
 		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.shininess"), 32.0f);
 		glUniform3fv(glGetUniformLocation(heightmap_shader.program, "material.specular"), 1, glm::value_ptr(glm::vec3(0.94f, 0.80f, 0.49f)));
@@ -336,7 +421,7 @@ int main(void)
 		glUniform1i(skybox_shader["uSkybox"], 2);
 		draw_large_cube();
 		glDepthFunc(GL_LESS);
-		
+
 
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
@@ -344,12 +429,11 @@ int main(void)
 		/* Poll for and process events */
 		glfwPollEvents();
 	}
-
 	glfwTerminate();
 	return 0;
 }
 
-void RenderScene(shader shader){
+void RenderScene(shader shader) {
 
 }
 
@@ -360,7 +444,7 @@ void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 	//wasd movement
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
 		camera.ProcessKeyboard(FORWARD, deltaTime);
 		updateCameraHeight();
 	}
@@ -414,8 +498,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 /* funzione che aggiorna la posizione (valore y) della camera seguendo l'altezza delle dune */
-void updateCameraHeight(){
-	float heightValue = heightmap.heightFunction(camera.Position.x,camera.Position.z,heightmapRep);
+void updateCameraHeight() {
+	float heightValue = heightmap.heightFunction(camera.Position.x, camera.Position.z, heightmapRep);
 	camera.Position.y += (heightValue * heightmapScale);
 }
 

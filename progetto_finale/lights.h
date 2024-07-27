@@ -30,6 +30,7 @@ struct Light{
 		quadratic = 0.0075f;
 
 		position = pos;
+		direction = -pos;
 	}
 
 	void init_spotLight(glm::vec3 pos, glm::vec3 dir, float angle_cutoff, float angle_outerCutOff) {
@@ -41,7 +42,8 @@ struct Light{
 	}
 
 	void init_directional(glm::vec3 dir) {
-		direction = dir;
+		direction = -dir;
+		position = dir;
 	}
 
 
