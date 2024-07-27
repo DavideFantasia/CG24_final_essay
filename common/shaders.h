@@ -12,12 +12,24 @@
 
 struct shader{
         GLuint   vertex_shader, geometry_shader, compute_shader, fragment_shader, program;
-
         std::map<std::string,int> uni;
 
         void bind(std::string name){
             uni[name] = glGetUniformLocation(program, name.c_str());
         }
+
+
+		void PrintActiveUniform(){
+			GLint numUniforms;
+			glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
+			for (int i = 0; i < numUniforms; ++i) {
+				GLint length;
+				GLenum type;
+				GLchar name[256];
+				glGetActiveUniform(program, i, 256, &length, NULL, &type, name);
+				std::cout << "Active Uniform #" << i << ": " << name << std::endl;
+			}
+		}
 
         int operator[](std::string name){
 			if (uni.find(name) == uni.end()) {
