@@ -5,6 +5,7 @@ in vec2 vTexCoord;
 
 uniform sampler2D uTexture;
 
+
 void main(void) 
 { 
 	color = texture(uTexture,vTexCoord);
