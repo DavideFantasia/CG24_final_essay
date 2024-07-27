@@ -5,6 +5,7 @@ out vec4 color;
 in vec2 vTexCoord;
 in vec3 vColor; 
 in vec3 vPos; 
+in vec4 vPosLightSpace;
 
 struct DirLight {
 	vec3 direction;
@@ -57,6 +58,38 @@ struct Material {
 
 uniform Material material;
 uniform vec3 uViewPos;
+uniform sampler2D uShadowMap;
+uniform float uBias;
+
+//funzione per calcolare il fattore di ombra nel frammento
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
+{
+	//normalizzazione
+	vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+	//passaggio a cordinate NDC
+	projCoords = projCoords * 0.5 + 0.5;
+	//sampling dalla shadow map
+	float closestDepth = texture(uShadowMap, projCoords.xy).r;
+	float currentDepth = projCoords.z;
+
+	//check per vedere se siamo in ombra nel frammento attuale
+	//float bias = max(0.025 * (1.0 - dot(normal, lightDir)), uBias);
+	float bias = uBias;
+	float shadow = 0.0;
+	//sampling dei n texel attorno all'attuale frammento per poter smussare il bordo dell'ombra
+	int shadowSample = 2;
+	vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
+	for(int x = -shadowSample; x <= shadowSample; ++x){
+		for(int y = -shadowSample; y <= shadowSample; ++y){
+			float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+			shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+		}
+	}
+	shadow /= pow(((2*shadowSample)+1),2);
+
+	return shadow;
+}
+
 
 void main(void) 
 { 
@@ -64,7 +97,9 @@ void main(void)
 	vec3 viewDir = normalize(uViewPos - vPos);
 	vec3 norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
 
-	vec3 result = vec3(CalcSpotLight(spotlight, norm, vPos, viewDir));
+	//vec3 result = vec3(CalcSpotLight(spotlight, norm, vPos, viewDir));
+	vec3 result = vec3(CalcDirLight(dirLight, norm,viewDir));
+
 	result = pow(result,vec3(1.0/gamma));
 
 	color = vec4(result, 1.0);
@@ -84,7 +119,9 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	vec3 ambient = light.ambient * diffuseFactor;
 	vec3 diffuse = light.diffuse * diff * diffuseFactor;
 	vec3 specular = light.specular * spec * material.specular;
-	return (ambient + diffuse + specular);
+	
+	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir);
+	return (ambient + (diffuse + specular)*(1.0-shadow));
 }
 
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
@@ -109,7 +146,9 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
 	ambient *= attenuation;
 	diffuse *= attenuation;
 	specular *= attenuation;
-	return (ambient + diffuse + specular);
+
+	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir);
+	return (ambient + (diffuse + specular)*(1.0-shadow));
 }
 
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
@@ -143,5 +182,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
 	ambient *= attenuation;
 	diffuse *= attenuation;
 	specular *= attenuation;
-	return (ambient + diffuse + specular);
+
+	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir);
+	return (ambient + (diffuse + specular)*(1.0-shadow));
 }

@@ -8,6 +8,7 @@ layout (location = 4) in vec2 aTexCoord;
 out vec2 vTexCoord;
 out vec3 vColor;
 out vec3 vPos; 
+out vec4 vPosLightSpace;
 
 uniform mat4 uProj;
 uniform mat4 uView;
@@ -16,6 +17,8 @@ uniform mat4 uModel;
 uniform sampler2D uColorImage;
 uniform float uHeightScale;
 uniform float uTextureRep;
+uniform mat4 uLightSpaceMatrix;
+
 
 void main(void)
 {
@@ -25,6 +28,7 @@ void main(void)
     vTexCoord = aTexCoord;
     vColor = aColor;
 	vPos = vec3((uModel*vec4(newPosition, 1.0)));
+    vPosLightSpace = uLightSpaceMatrix * vec4(vPos, 1.0);
 
     gl_Position = uProj * uView * uModel * vec4(newPosition, 1.0);
 }
