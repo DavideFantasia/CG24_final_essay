@@ -152,7 +152,7 @@ struct projector {
 
 		//TBD: set the view volume properly so that they are a close fit of the bunding box passed as parameter
 		proj_matrix = glm::ortho(-4.f, 4.f, -4.f, 4.f, 0.f, distance_light * 2.f);
-		//		proj_matrix = glm::perspective(3.14f/2.f,1.0f,0.1f, distance_light*2.f);
+		//proj_matrix = glm::perspective(3.14f/2.f,1.0f,0.1f, distance_light*2.f);
 		return proj_matrix;
 	}
 	glm::mat4 light_matrix() {
@@ -259,45 +259,15 @@ int main(void)
 	/*-------- Passaggio ID delle texture alla Shader ----------*/
 	glUniform1i(heightmap_shader["uColorImage"], 0);
 
-	Light lampadina;
-	//lampadina.init_bulb(glm::vec3(1.f, 3.f, 1.f));
-	lampadina.init_directional(glm::vec3(0.75f, 3.f, -2.f));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.direction"), 1, glm::value_ptr(lampadina.direction));
 
-	lampadina.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
-	lampadina.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
-	lampadina.specular = glm::vec3(0.65f, 0.65f, 0.65f);
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.ambient"), 1, glm::value_ptr(lampadina.ambient));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.diffuse"), 1, glm::value_ptr(lampadina.diffuse));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "dirLight.specular"), 1, glm::value_ptr(lampadina.specular));
+	/* ---------------- creazione e passaggio informazioni sulle luci --------------------*/
+	Light sun = sun.directional_init(glm::vec3(0.75f, 3.f, -2.f));
+	sun.set_uniform(heightmap_shader.program);
 
 
-	/*
-	lampadina.init_spotLight(glm::vec3(1.f, 2.f, 1.f), glm::vec3(-0.5f, -1.f, -1.f), 50.f, 25.f);
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.position"), 1, glm::value_ptr(lampadina.position));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.direction"), 1, glm::value_ptr(lampadina.direction));
-
-	lampadina.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
-	lampadina.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
-	lampadina.specular = glm::vec3(0.65f, 0.65f, 0.65f);
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.ambient"), 1, glm::value_ptr(lampadina.ambient));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.diffuse"), 1, glm::value_ptr(lampadina.diffuse));
-	glUniform3fv(glGetUniformLocation(heightmap_shader.program, "spotlight.specular"), 1, glm::value_ptr(lampadina.specular));
-
-	// Valori di attenuazione per la luce spot
-	lampadina.constant = 1.0f;
-	lampadina.linear = 0.09f;
-	lampadina.quadratic = 0.032f;
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.constant"), lampadina.constant);
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.linear"), lampadina.linear);
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.quadratic"), lampadina.quadratic);
+	Light spotLight = spotLight.spotlight_init(glm::vec3(1.f, 2.f, 1.f), glm::vec3(-0.5f, -1.f, -1.f), 25.f, 35.f);
+	spotLight.set_uniform(heightmap_shader.program);
 	
-	// Angoli per la luce spot
-	lampadina.cutOff = glm::cos(glm::radians(12.5f));
-	lampadina.outerCutOff = glm::cos(glm::radians(15.0f));
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.cutOff"), lampadina.cutOff);
-	glUniform1f(glGetUniformLocation(heightmap_shader.program, "spotlight.outerCutOff"), lampadina.outerCutOff);
-	*/
 	glUniform3fv(heightmap_shader["uViewPos"], 1, &camera.Position[0]);
 	glUniform1f(heightmap_shader["uBias"], depth_bias);
 	/*
@@ -329,7 +299,8 @@ int main(void)
 
 
 	
-	Lproj.view_matrix = glm::lookAt(lampadina.position, lampadina.direction, glm::vec3(0.f, 0.f, 1.f));
+	//Lproj.view_matrix = glm::lookAt(spotLight.position, spotLight.direction, glm::vec3(0.f, 0.f, 1.f));
+	Lproj.view_matrix = glm::lookAt(sun.position, sun.direction, glm::vec3(0.f, 0.f, 1.f));
 	
 	depthBuffer.create(Lproj.sm_size_x, Lproj.sm_size_y, true);
 
@@ -339,6 +310,11 @@ int main(void)
 		/* Render here */
 		glClearColor(0.8f, 0.8f, 0.9f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+		// Per-frame time logic
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
 
 		//deph mapping
 		
@@ -369,10 +345,6 @@ int main(void)
 		/*-----------------------------------------------------------------------------*/
 
 		glViewport(0, 0, width, height);
-		// Per-frame time logic
-		float currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
 		
 		// Input
 		processInput(window);
