@@ -48,8 +48,7 @@ uniform sampler2D uShadowMap;
 uniform float uBias;
 
 //funzione per calcolare il fattore di ombra nel frammento
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
-{
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir, int shadowSample){
 	//normalizzazione
 	vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
@@ -65,7 +64,6 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 	float shadow = 0.0;
 
 	//sampling dei n texel attorno all'attuale frammento per poter smussare il bordo dell'ombra
-	int shadowSample = 2;
 	vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
 	for(int x = -shadowSample; x <= shadowSample; ++x){
 		for(int y = -shadowSample; y <= shadowSample; ++y){
@@ -85,8 +83,8 @@ void main(void)
 	vec3 viewDir = normalize(uViewPos - vPos);
 	vec3 norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
 
-	vec3 result = vec3(CalcSpotLight(spotlight, norm, vPos, viewDir));
-	result += vec3(CalcDirLight(dirLight, norm,viewDir));
+	vec3 result = vec3(CalcDirLight(dirLight, norm,viewDir));
+	//result +=  vec3(CalcSpotLight(spotlight, norm, vPos, viewDir));
 
 	result = pow(result,vec3(1.0/gamma));
 
@@ -94,7 +92,7 @@ void main(void)
 } 
 
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
-	vec3 lightDir = normalize(-light.direction);
+	vec3 lightDir = normalize(light.direction);
 	vec3 halfwayDir = normalize(lightDir + viewDir);
 
 	// diffuse shading
@@ -108,7 +106,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	vec3 diffuse = light.diffuse * diff * diffuseFactor;
 	vec3 specular = light.specular * spec * material.specular;
 	
-	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir);
+	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir, 5);
 	return (ambient + (diffuse + specular)*(1.0-shadow));
 }
 
@@ -144,6 +142,6 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
 	diffuse *= attenuation;
 	specular *= attenuation;
 
-	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir);
+	float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir, 2);
 	return (ambient + (diffuse + specular)*(1.0-shadow));
 }

@@ -85,7 +85,7 @@ public:
     // Static methods to initialize lights
     static Light directional_init(const glm::vec3& direction) {
         Light light;
-        light.direction = -direction; 
+        light.direction = direction; 
         light.position = direction;
 
         light.is_spotlight = false;
@@ -109,6 +109,20 @@ public:
 
     void update_direction(const glm::vec3& newDir) {
         direction = newDir;
+    }
+
+    void rotate_direction(float angle) {
+        // Calcolo della direzione iniziale del sole senza rotazione
+        glm::vec3 sun_direction = glm::normalize(glm::vec3(cos(glm::radians(angle)), sin(glm::radians(angle)), 0.0f));
+
+        // Creazione della matrice di rotazione di 90° sull'asse y
+        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // Applicazione della rotazione alla direzione del sole
+        glm::vec4 rotated_sun_direction = rotation * glm::vec4(sun_direction, 1.0f);
+
+        // Aggiornamento della direzione del sole
+        direction = glm::vec3(rotated_sun_direction);
     }
 
     // Set uniform method

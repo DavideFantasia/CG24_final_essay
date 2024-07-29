@@ -261,12 +261,12 @@ int main(void)
 
 
 	/* ---------------- creazione e passaggio informazioni sulle luci --------------------*/
-	Light sun = sun.directional_init(glm::vec3(0.75f, 3.f, -2.f));
+	Light sun = sun.directional_init(glm::vec3(0.f, -1.f, 0.f));
 	sun.set_uniform(heightmap_shader.program);
 
 
 	Light spotLight = spotLight.spotlight_init(glm::vec3(1.f, 2.f, 1.f), glm::vec3(-0.5f, -1.f, -1.f), 25.f, 35.f);
-	spotLight.set_uniform(heightmap_shader.program);
+	//spotLight.set_uniform(heightmap_shader.program);
 	
 	glUniform3fv(heightmap_shader["uViewPos"], 1, &camera.Position[0]);
 	glUniform1f(heightmap_shader["uBias"], depth_bias);
@@ -304,6 +304,11 @@ int main(void)
 	
 	depthBuffer.create(Lproj.sm_size_x, Lproj.sm_size_y, true);
 
+
+
+
+	float dayNight_rotation_angle = 0.f;
+	float dayNight_rotation_speed = 10.0f; // velocità di rotazione del sole (gradi per secondo)
 	/* ------------------ RENDER LOOP ---------------------------*/
 	while (!glfwWindowShouldClose(window))
 	{
@@ -315,12 +320,20 @@ int main(void)
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-
-		//deph mapping
 		
+		// Calcolare l'angolo di rotazione del sole
+		
+		dayNight_rotation_angle += (dayNight_rotation_speed * deltaTime);
+		
+		sun.rotate_direction(dayNight_rotation_angle);
+		//aggiornamento della view matrix del proiettore
+		Lproj.view_matrix = glm::lookAt(sun.direction, glm::vec3(0.0f), glm::vec3(0.f, 0.f, 1.f));
+		//deph mapping
+
 		glUseProgram(depth_shader.program);
 
 		Lproj.set_projection(Lproj.view_matrix);
+		//ruotiamo la matrice di Light Space di dayNight_rotation_angle per simulare il ciclo giorno notte
 		glUniformMatrix4fv(depth_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(Lproj.light_matrix())[0][0]);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, depthBuffer.id_fbo);
@@ -352,6 +365,8 @@ int main(void)
 
 		//Terrain Rendering
 		glUseProgram(heightmap_shader.program);
+		sun.set_uniform(heightmap_shader.program); //aggiornamento dei dati del sole che ruota
+
 		glUniformMatrix4fv(heightmap_shader["uView"], 1, GL_FALSE, &view[0][0]);
 		glUniformMatrix4fv(heightmap_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
 		glUniformMatrix4fv(heightmap_shader["uModel"], 1, GL_FALSE, &model_matrix[0][0]);
