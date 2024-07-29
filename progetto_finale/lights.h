@@ -88,6 +88,8 @@ public:
         light.direction = direction; 
         light.position = direction;
 
+        light.ambient = glm::vec3(0.1f);
+
         light.is_spotlight = false;
         return light;
     }

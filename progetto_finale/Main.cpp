@@ -130,12 +130,13 @@ texture heightmap, sandTexture;
 char heightmap_name[256] = { "./textures/terrain/height_map_blurred.png" };
 char sandTexture_name[256] = { "./textures/terrain/sand_texture.jpg" };
 /*-------- skybox texture ----------*/
-texture skybox;
+texture daySkybox, nightSkybox;
 /*
 * id 0: heightmap terrain
 * id 1: desert texture terrain
-* id 2: skybox
-* id 3: shadowmap, con scopo di shadow mapping
+* id 2: daySkybox
+* id 3: nightSkybox
+* id 4: shadowmap, con scopo di shadow mapping
 */
 /* ---- framebuffer object for shadowmapping ----*/
 frame_buffer_object depthBuffer;
@@ -168,10 +169,15 @@ void load_textures() {
 	heightmap.load(std::string(heightmap_name), 0, false);
 	sandTexture.load(std::string(sandTexture_name), 1, true);
 	
-	std::string path = "./textures/cube_map/HD/";
-	skybox.load_cubemap(path + "posx.png", path + "negx.png",
+	std::string path = "./textures/cube_map/day/";
+	daySkybox.load_cubemap(path + "posx.bmp", path + "negx.bmp",
+		path + "posy.bmp", path + "negy.bmp",
+		path + "posz.bmp", path + "negz.bmp", 2);
+
+	path = "./textures/cube_map/night/";
+	nightSkybox.load_cubemap(path + "posx.png", path + "negx.png",
 		path + "posy.png", path + "negy.png",
-		path + "posz.png", path + "negz.png", 2);
+		path + "posz.png", path + "negz.png", 3);
 }
 
 void RenderScene(shader shader);
@@ -266,7 +272,7 @@ int main(void)
 
 
 	Light spotLight = spotLight.spotlight_init(glm::vec3(1.f, 2.f, 1.f), glm::vec3(-0.5f, -1.f, -1.f), 25.f, 35.f);
-	//spotLight.set_uniform(heightmap_shader.program);
+	spotLight.set_uniform(heightmap_shader.program);
 	
 	glUniform3fv(heightmap_shader["uViewPos"], 1, &camera.Position[0]);
 	glUniform1f(heightmap_shader["uBias"], depth_bias);
@@ -277,7 +283,8 @@ int main(void)
 
 	/* -------- Passaggio Uniform alla Texture Shader ------------*/
 	glUseProgram(skybox_shader.program);
-	glUniform1i(skybox_shader["uSkybox"], 2);
+	glUniform1i(skybox_shader["uDaySkybox"], 2);
+	glUniform1i(skybox_shader["uNightSkybox"], 3);
 	glUniformMatrix4fv(skybox_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
 	glUniformMatrix4fv(skybox_shader["uView"], 1, GL_FALSE, &view[0][0]);
 	glUseProgram(0);
@@ -323,6 +330,7 @@ int main(void)
 		
 		// Calcolare l'angolo di rotazione del sole
 		
+		// Calcolare l'angolo di rotazione del sole
 		dayNight_rotation_angle += (dayNight_rotation_speed * deltaTime);
 		
 		sun.rotate_direction(dayNight_rotation_angle);
@@ -374,11 +382,12 @@ int main(void)
 		//shadowmapping
 		glUniformMatrix4fv(heightmap_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(Lproj.light_matrix())[0][0]);
 
+		//passaggio della shadowmap (slot 4)
 		GLint at;
 		glGetIntegerv(GL_ACTIVE_TEXTURE, &at);
-		glActiveTexture(GL_TEXTURE3);
+		glActiveTexture(GL_TEXTURE4);
 		glBindTexture(GL_TEXTURE_2D, depthBuffer.id_depth);
-		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uShadowMap"), 3);
+		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uShadowMap"), 4);
 		glActiveTexture(at);
 
 		//passaggio info per il materiale
@@ -405,7 +414,7 @@ int main(void)
 		glUseProgram(skybox_shader.program);
 		glUniformMatrix4fv(skybox_shader["uView"], 1, GL_FALSE, &view[0][0]);
 		glUniformMatrix4fv(skybox_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
-		glUniform1i(skybox_shader["uSkybox"], 2);
+		glUniform1f(skybox_shader["uDayNightAngle"], dayNight_rotation_angle);
 		draw_large_cube();
 		glDepthFunc(GL_LESS);
 
