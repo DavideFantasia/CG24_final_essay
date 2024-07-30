@@ -30,7 +30,7 @@ struct material {
 struct renderable {
 
 	struct element_array {
-		element_array():ind(0), mode(0), count(0), itype(GL_UNSIGNED_INT){}
+		element_array() :ind(0), mode(0), count(0), itype(GL_UNSIGNED_INT) {}
 		GLuint ind, mode, count, itype;
 	};
 
@@ -82,7 +82,7 @@ struct renderable {
 
 		/* create a buffer for the render data in video RAM */
 		vbos.push_back(va_id);
-		
+
 		glBindBuffer(GL_ARRAY_BUFFER, vbos.back());
 		glEnableVertexAttribArray(attribute_index);
 
@@ -102,7 +102,7 @@ struct renderable {
 		unsigned int stride = 0,
 		unsigned int offset = 0) {
 
-		vn = count/ num_components;
+		vn = count / num_components;
 
 		glBindVertexArray(vao);
 
@@ -149,12 +149,13 @@ struct renderable {
 		return elements.back().ind;
 	};
 
-	/* this function return the first set of indices (if present), that is: elements[0]. 
+	/* this function return the first set of indices (if present), that is: elements[0].
 	*  Often we have just a set of indices so it comes handy. Otherwise access elements[id]
 	*  with the set of indices you need
 	*/
 	element_array operator()() {
-		if (!elements.empty()) return elements[0]; else return element_array();}
+		if (!elements.empty()) return elements[0]; else return element_array();
+	}
 
 	template <>
 	int type_to_GL<unsigned int>() { return GL_UNSIGNED_INT; }
@@ -175,7 +176,7 @@ struct renderable {
 	}
 
 	template <>
-	GLuint add_vertex_attribute(const char * values, unsigned int count,
+	GLuint add_vertex_attribute(const char* values, unsigned int count,
 		unsigned int attribute_index,
 		unsigned int num_components,
 		unsigned int stride,
@@ -192,9 +193,3 @@ struct renderable {
 		return this->add_vertex_attribute(values, count, attribute_index, num_components, (unsigned int)GL_UNSIGNED_BYTE, stride, offset);
 	}
 };
-
-
-
-
-
-
