@@ -136,10 +136,11 @@ texture daySkybox, nightSkybox;
 * id 1: desert texture terrain
 * id 2: daySkybox
 * id 3: nightSkybox
-* id 4: shadowmap, con scopo di shadow mapping
+* id 4: shadowmap del sole, con scopo di shadow mapping
+* id 5: shadowmap dello spot light, con scopo di shadow mapping
 */
 /* ---- framebuffer object for shadowmapping ----*/
-frame_buffer_object depthBuffer;
+frame_buffer_object sunDepthBuffer, lampDepthBuffer;
 
 /* projector */
 float depth_bias;
@@ -162,7 +163,7 @@ struct projector {
 	// size of the shadow map in texels
 	int sm_size_x, sm_size_y;
 };
-projector Lproj;
+projector sunProjector, lampProjector;
 
 
 void load_textures() {
@@ -220,7 +221,7 @@ int main(void)
 
 	/* load the shaders */
 	std::string shaders_path = "./shaders/";
-	heightmap_shader.create_program((shaders_path + "heightmap.vert").c_str(), (shaders_path + "heightmap.frag").c_str());
+	heightmap_shader.create_program((shaders_path + "pbr.vert").c_str(), (shaders_path + "pbr.frag").c_str());
 	skybox_shader.create_program((shaders_path + "skybox.vert").c_str(), (shaders_path + "skybox.frag").c_str());
 	fsq_shader.create_program((shaders_path + "fsq.vert").c_str(), (shaders_path + "fsq.frag").c_str());
 	depth_shader.create_program((shaders_path + "depthShader.vert").c_str(), (shaders_path + "depthShader.frag").c_str());
@@ -252,9 +253,13 @@ int main(void)
 
 	/* ------------ light projection ------------ */
 
-	Lproj.sm_size_x = 2048;
-	Lproj.sm_size_y = 2048;
-	depth_bias = 0.005f;
+	sunProjector.sm_size_x = 2048;
+	sunProjector.sm_size_y = 2048;
+
+	lampProjector.sm_size_x = 2048;
+	lampProjector.sm_size_y = 2048;
+
+	depth_bias = 0.01f;
 	distance_light = 5;
 
 	/* ----------- Passaggio Uniform per la creazione del Terrain ----------------*/
@@ -297,21 +302,18 @@ int main(void)
 
 	load_textures();
 
+	sunProjector.view_matrix = glm::lookAt(sun.position, sun.direction, glm::vec3(0.f, 0.f, 1.f));
+	lampProjector.view_matrix = glm::lookAt(spotLight.position, spotLight.direction, glm::vec3(0.f, 0.f, 1.f));
+
+	sunDepthBuffer.create(sunProjector.sm_size_x, sunProjector.sm_size_y, true);
+	lampDepthBuffer.create(lampProjector.sm_size_x, lampProjector.sm_size_y, true);
+
 	renderable r_cube = shape_maker::cube();
 
 	/*---- attesa fine generazione del terreno -----*/
 	terraingeneration_thread.join();
 	s_plane.to_renderable(r_terrain);
 	r_quad = shape_maker::quad();
-
-
-	
-	//Lproj.view_matrix = glm::lookAt(spotLight.position, spotLight.direction, glm::vec3(0.f, 0.f, 1.f));
-	Lproj.view_matrix = glm::lookAt(sun.position, sun.direction, glm::vec3(0.f, 0.f, 1.f));
-	
-	depthBuffer.create(Lproj.sm_size_x, Lproj.sm_size_y, true);
-
-
 
 
 	float dayNight_rotation_angle = 0.f;
@@ -335,17 +337,17 @@ int main(void)
 		
 		sun.rotate_direction(dayNight_rotation_angle);
 		//aggiornamento della view matrix del proiettore
-		Lproj.view_matrix = glm::lookAt(sun.direction, glm::vec3(0.0f), glm::vec3(0.f, 0.f, 1.f));
+		sunProjector.view_matrix = glm::lookAt(sun.direction, glm::vec3(0.0f), glm::vec3(0.f, 0.f, 1.f));
 		//deph mapping
 
 		glUseProgram(depth_shader.program);
 
-		Lproj.set_projection(Lproj.view_matrix);
+		sunProjector.set_projection(sunProjector.view_matrix);
 		//ruotiamo la matrice di Light Space di dayNight_rotation_angle per simulare il ciclo giorno notte
-		glUniformMatrix4fv(depth_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(Lproj.light_matrix())[0][0]);
+		glUniformMatrix4fv(depth_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(sunProjector.light_matrix())[0][0]);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, depthBuffer.id_fbo);
-		glViewport(0, 0, Lproj.sm_size_x, Lproj.sm_size_y);
+		glBindFramebuffer(GL_FRAMEBUFFER, sunDepthBuffer.id_fbo);
+		glViewport(0, 0, sunProjector.sm_size_x, sunProjector.sm_size_y);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 			glCullFace(GL_FRONT); //per sistemare il peter-panning
 			// -------- render scene
@@ -361,11 +363,37 @@ int main(void)
 			glCullFace(GL_BACK);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glUseProgram(0);
+
+		//rendering depth map del faretto
+		glUseProgram(depth_shader.program);
+
+		lampProjector.set_projection(lampProjector.view_matrix);
+		glUniformMatrix4fv(depth_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(lampProjector.light_matrix())[0][0]);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, lampDepthBuffer.id_fbo);
+		glViewport(0, 0, lampProjector.sm_size_x, lampProjector.sm_size_y);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+			glCullFace(GL_FRONT); //per sistemare il peter-panning
+			// -------- render scene
+			glUniformMatrix4fv(depth_shader["uModel"], 1, GL_FALSE, &model_matrix[0][0]);
+			r_terrain.bind();
+			glDrawElements(r_terrain().mode, r_terrain().count, r_terrain().itype, 0);
+
+
+			glUniformMatrix4fv(depth_shader["uModel"], 1, GL_FALSE, &(glm::scale(glm::mat4(1.f), glm::vec3(0.5f, 0.5f, 0.5f)))[0][0]);
+			r_cube.bind();
+			glDrawElements(r_cube().mode, r_cube().count, r_cube().itype, 0);
+		// ------
+		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glUseProgram(0);
 		// ripristino del frame buffer attivo
+		
 
 		/*-----------------------------------------------------------------------------*/
-
+		
 		glViewport(0, 0, width, height);
+
 		
 		// Input
 		processInput(window);
@@ -379,21 +407,29 @@ int main(void)
 		glUniformMatrix4fv(heightmap_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
 		glUniformMatrix4fv(heightmap_shader["uModel"], 1, GL_FALSE, &model_matrix[0][0]);
 		glUniform3fv(heightmap_shader["uViewPos"], 1, &camera.Position[0]);
-		//shadowmapping
-		glUniformMatrix4fv(heightmap_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(Lproj.light_matrix())[0][0]);
 
-		//passaggio della shadowmap (slot 4)
+		//shadowmapping del sole
+		glUniformMatrix4fv(heightmap_shader["uSunLightSpaceMatrix"], 1, GL_FALSE, &(sunProjector.light_matrix())[0][0]);
+		//passaggio della shadowmap del sole(slot 4)
 		GLint at;
 		glGetIntegerv(GL_ACTIVE_TEXTURE, &at);
 		glActiveTexture(GL_TEXTURE4);
-		glBindTexture(GL_TEXTURE_2D, depthBuffer.id_depth);
-		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uShadowMap"), 4);
+		glBindTexture(GL_TEXTURE_2D, sunDepthBuffer.id_depth);
+		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uSunShadowMap"), 4);
+		glActiveTexture(at);
+
+		//shadowmapping del faretto
+		glUniformMatrix4fv(heightmap_shader["uLampLightSpaceMatrix"], 1, GL_FALSE, &(lampProjector.light_matrix())[0][0]);
+		//passaggio della shadowmap del faretto(slot 5)
+		glGetIntegerv(GL_ACTIVE_TEXTURE, &at);
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_2D, lampDepthBuffer.id_depth);
+		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uLampShadowMap"), 5);
 		glActiveTexture(at);
 
 		//passaggio info per il materiale
-		glUniform1i(glGetUniformLocation(heightmap_shader.program, "material.diffuse_map"), 1);
-		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.shininess"), 0.5f);
-		glUniform3fv(glGetUniformLocation(heightmap_shader.program, "material.specular"), 1, glm::value_ptr(glm::vec3(0.94f, 0.80f, 0.49f)));
+		
+
 
 		r_terrain.bind();
 		glDrawElements(r_terrain().mode, r_terrain().count, r_terrain().itype, 0);
@@ -403,6 +439,10 @@ int main(void)
 		glUniform1i(glGetUniformLocation(heightmap_shader.program, "material.diffuse_map"), 1);
 		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.shininess"), 32.0f);
 		glUniform3fv(glGetUniformLocation(heightmap_shader.program, "material.specular"), 1, glm::value_ptr(glm::vec3(0.94f, 0.80f, 0.49f)));
+
+		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.metallic"), 0.75);
+		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.roughness"), 0.5f);
+		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.ao"), 0.05f);
 
 		r_cube.bind();
 		glDrawElements(r_cube().mode, r_cube().count, r_cube().itype, 0);
@@ -417,7 +457,6 @@ int main(void)
 		glUniform1f(skybox_shader["uDayNightAngle"], dayNight_rotation_angle);
 		draw_large_cube();
 		glDepthFunc(GL_LESS);
-
 
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
