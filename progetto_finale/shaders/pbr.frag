@@ -15,7 +15,7 @@ struct DirLight {
 	vec3 specular;
 };
 uniform DirLight dirLight;
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse);
+vec3 CalcDirLight(DirLight light, vec3 viewDir, vec3 diffuse, vec3 normal, float roughness, float metallic);
 
 struct SpotLight{
 	vec3 position;
@@ -33,18 +33,24 @@ struct SpotLight{
 	float outerCutOff;
 };
 uniform SpotLight spotlight;
-vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 diffuse);
+vec3 CalcSpotLight(SpotLight light, vec3 fragPos, vec3 viewDir, vec3 diffuse, vec3 normal, float roughness, float metallic);
 
 //struct per i materiali
 struct Material {
+	vec3 diffuse_factor;
+	float metallic_factor;
+	float roughness_factor;
+
 	sampler2D diffuse_map;
+	int has_diffuse_map;
+	sampler2D metallic_map;
+	int has_metallic_map;
+	sampler2D roughness_map;
+	int has_roughness_map;
+	sampler2D normal_map;
+	int has_normal_map;
 
-	vec3 specular;
-
-	float metallic;
-	float roughness;
 	float ao;
-
 };
 
 uniform Material material;
@@ -128,12 +134,36 @@ void main(void)
 { 
 	float gamma = 2.2;
 	vec3 viewDir = normalize(uViewPos - vPos); //V
-	vec3 norm = normalize(cross(dFdx(vPos),dFdy(vPos))); //N
+	
+	//check for the textures (maps)
+	vec3 norm; //N
+	if(material.has_normal_map == 1)
+		norm = vec3(texture(material.normal_map, vTexCoord));
+	else
+		norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
+	//diffuse factor
+	vec3 diffuse;
+	if(material.has_diffuse_map == 1)
+		diffuse = vec3(texture(material.diffuse_map, vTexCoord));
+	else
+		diffuse = vec3(material.diffuse_factor);
+	//roughness
+	float roughness;
+	if(material.has_roughness_map  == 1)
+		roughness = texture(material.roughness_map, vTexCoord).r;
+	else
+		roughness = material.roughness_factor;
 
-	vec3 diffuse = vec3(texture(material.diffuse_map, vTexCoord));
+	//metallic
+	float metallic;
+	if(material.has_metallic_map  == 1)
+		metallic = texture(material.metallic_map, vTexCoord).r;
+	else
+		metallic = material.metallic_factor;
+	// ------------------------------------------------------------------------------
 
-	vec3 result = vec3(CalcDirLight(dirLight, norm,viewDir, diffuse));
-	result +=  vec3(CalcSpotLight(spotlight, norm, vPos, viewDir, diffuse));
+	vec3 result = vec3(CalcDirLight(dirLight, viewDir, diffuse, norm, roughness, metallic));
+	result +=  vec3(CalcSpotLight(spotlight, vPos, viewDir, diffuse, norm, roughness, metallic));
 
 	vec3 ambient = spotlight.ambient * diffuse * material.ao;
 	result += ambient;
@@ -146,21 +176,21 @@ void main(void)
 	color = vec4(result, 1.0);
 } 
 
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse){
+vec3 CalcDirLight(DirLight light, vec3 viewDir, vec3 diffuse, vec3 normal, float roughness, float metallic){
 	vec3 F0 = vec3(0.04); 
 	
-    F0 = mix(F0, diffuse, material.metallic);
+    F0 = mix(F0, diffuse, metallic);
 
 	// calculate per-light radiance
 	vec3 L = normalize(light.direction);
     vec3 H = normalize(viewDir + L);
-    float distance = length(light.direction - vPos);
-    float attenuation = 1.0 / (distance * distance);
-    vec3 radiance = light.diffuse * attenuation;
+    
+	//la radiance è l'attenuation * il colore della luce, ma essendo questa la luce del sole, non ha attenuazione
+	vec3 radiance = light.diffuse;
 
 	// Cook-Torrance BRDF
-    float NDF = DistributionGGX(normal, H, material.roughness);   
-    float G   = GeometrySmith(normal, viewDir, L, material.roughness);      
+    float NDF = DistributionGGX(normal, H, roughness);   
+    float G   = GeometrySmith(normal, viewDir, L, roughness);      
     vec3 F    = fresnelSchlick(clamp(dot(H, viewDir), 0.0, 1.0), F0);
        
 	vec3 numerator    = NDF * G * F; 
@@ -176,7 +206,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse){
     // multiply kD by the inverse metalness such that only non-metals 
     // have diffuse lighting, or a linear blend if partly metal (pure metals
     // have no diffuse light).
-    kD *= 1.0 - material.metallic;	  
+    kD *= 1.0 - metallic;	  
 
 	// scale light by NdotL
     float NdotL = max(dot(normal, L), 0.0);     
@@ -185,13 +215,13 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse){
 	float shadow = ShadowCalculation(vPosSunLightSpace, normal, viewDir, 2, uSunShadowMap);
 
 	// add to outgoing radiance Lo
-    return (kD * diffuse / PI + material.specular) * radiance * NdotL * (1.0-shadow);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+    return (kD * diffuse / PI + specular) * radiance * NdotL * (1.0-shadow);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
 }
 
-vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 diffuse){
+vec3 CalcSpotLight(SpotLight light, vec3 fragPos, vec3 viewDir, vec3 diffuse, vec3 normal, float roughness, float metallic){
 	vec3 F0 = vec3(0.04); 
 	
-    F0 = mix(F0, diffuse, material.metallic);
+    F0 = mix(F0, diffuse, metallic);
 
 	// calculate per-light radiance
 	vec3 L = normalize(light.position - fragPos);
@@ -207,8 +237,8 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec
 	float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
 
 	// Cook-Torrance BRDF
-    float NDF = DistributionGGX(normal, H, material.roughness);   
-    float G   = GeometrySmith(normal, viewDir, L, material.roughness);      
+    float NDF = DistributionGGX(normal, H, roughness);   
+    float G   = GeometrySmith(normal, viewDir, L, roughness);      
     vec3 F    = fresnelSchlick(clamp(dot(H, viewDir), 0.0, 1.0), F0);
        
 	vec3 numerator    = NDF * G * F; 
@@ -224,7 +254,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec
     // multiply kD by the inverse metalness such that only non-metals 
     // have diffuse lighting, or a linear blend if partly metal (pure metals
     // have no diffuse light).
-    kD *= 1.0 - material.metallic;	  
+    kD *= 1.0 - metallic;	  
 
 	// scale light by NdotL
     float NdotL = max(dot(normal, L), 0.0);     
@@ -233,5 +263,5 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec
 	float shadow = ShadowCalculation(vPosLampLightSpace, normal, viewDir, 2, uLampShadowMap);
 
 	// add to outgoing radiance Lo
-    return (kD * diffuse / PI + material.specular) * radiance * NdotL * intensity * (1.0-shadow);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+    return (kD * diffuse / PI + specular) * radiance * NdotL * intensity * (1.0-shadow);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
 }

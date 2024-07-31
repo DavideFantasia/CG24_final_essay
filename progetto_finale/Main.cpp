@@ -27,7 +27,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #include "..\common\gltf_loader.h"
 #include "camera.h"
-
+#include "material.h"
 #include "terrainGenerator.h"
 #include "lights.h"
 
@@ -310,6 +310,8 @@ int main(void)
 
 	renderable r_cube = shape_maker::cube();
 
+	SandTerrainMaterial sand_material; //materiale del terreno
+
 	/*---- attesa fine generazione del terreno -----*/
 	terraingeneration_thread.join();
 	s_plane.to_renderable(r_terrain);
@@ -426,24 +428,15 @@ int main(void)
 		glBindTexture(GL_TEXTURE_2D, lampDepthBuffer.id_depth);
 		glUniform1i(glGetUniformLocation(heightmap_shader.program, "uLampShadowMap"), 5);
 		glActiveTexture(at);
-
-		//passaggio info per il materiale
 		
-
-
+		//passaggio uniform del materiale
+		sand_material.set_shader_uniforms(heightmap_shader.program);
 		r_terrain.bind();
 		glDrawElements(r_terrain().mode, r_terrain().count, r_terrain().itype, 0);
-
+		
 		//disegno del cubo
 		glUniformMatrix4fv(heightmap_shader["uModel"], 1, GL_FALSE, &(glm::scale(glm::mat4(1.f), glm::vec3(0.5f, 0.5f, 0.5f)))[0][0]);
-		glUniform1i(glGetUniformLocation(heightmap_shader.program, "material.diffuse_map"), 1);
-		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.shininess"), 32.0f);
-		glUniform3fv(glGetUniformLocation(heightmap_shader.program, "material.specular"), 1, glm::value_ptr(glm::vec3(0.94f, 0.80f, 0.49f)));
-
-		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.metallic"), 0.75);
-		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.roughness"), 0.5f);
-		glUniform1f(glGetUniformLocation(heightmap_shader.program, "material.ao"), 0.05f);
-
+		
 		r_cube.bind();
 		glDrawElements(r_cube().mode, r_cube().count, r_cube().itype, 0);
 

@@ -88,7 +88,9 @@ public:
         light.direction = direction; 
         light.position = direction;
 
-        light.ambient = glm::vec3(0.1f);
+        light.ambient = glm::vec3(0.2f);
+        light.diffuse = glm::vec3(1.0f, 0.95f, 0.8f);
+        light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
         light.is_spotlight = false;
         return light;
