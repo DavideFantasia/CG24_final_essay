@@ -2,7 +2,6 @@
 #include <GL/glew.h>
 #include <vector>
 #include "box3.h"
-//#include "texture.h"
 
 struct material {
 	std::string name;

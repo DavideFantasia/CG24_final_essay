@@ -1,5 +1,4 @@
 #pragma once
-//#include <tinygltf/tiny_gltf.h>
 #include <tiny_gltf.h>
 
 
@@ -31,7 +30,8 @@ struct gltf_loader {
 		bool ret = false;
 		if (ext.compare("glb") == 0) {
 			// assume binary glTF.
-			ret = loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
+			ret =
+				loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
 		}
 		else {
 			// assume ascii glTF.
@@ -53,13 +53,13 @@ struct gltf_loader {
 
 	void visit_node(glm::mat4  currT, int i_node) {
 
- 
-			if (model.nodes[i_node].mesh != -1)
-			{
-			
+
+		if (model.nodes[i_node].mesh != -1)
+		{
+
 			tinygltf::Mesh* mesh_ptr = mesh_ptr = &model.meshes[model.nodes[i_node].mesh];
 
-			const std::vector<double> & m = model.nodes[i_node].matrix;
+			const std::vector<double>& m = model.nodes[i_node].matrix;
 			glm::mat4 transform(1.f);
 			if (!m.empty())
 				transform = glm::mat4(m[0], m[1], m[2], m[3],
@@ -68,16 +68,16 @@ struct gltf_loader {
 					m[12], m[13], m[14], m[15]);
 
 
-			tinygltf::Mesh & mesh = *mesh_ptr;
+			tinygltf::Mesh& mesh = *mesh_ptr;
 			for (size_t i = 0; i < mesh.primitives.size(); i++) {
 				const tinygltf::Primitive& primitive = mesh.primitives[i];
 
 				if (primitive.indices < 0) return;
 
 				rs.push_back(renderable());
-				renderable & r = rs.back();
+				renderable& r = rs.back();
 				r.create();
-				r.transform = currT*transform;
+				r.transform = currT * transform;
 
 				std::map<std::string, int>::const_iterator it(primitive.attributes.begin());
 				std::map<std::string, int>::const_iterator itEnd(primitive.attributes.end());
@@ -109,8 +109,27 @@ struct gltf_loader {
 					if (it->first.compare("TANGENT") == 0)   attr_index = 3;
 					if (it->first.find("TEXCOORD_") != std::string::npos) {
 						std::string n = it->first.substr(9, 3);
-						attr_index = 4+ atoi(n.c_str());
+						attr_index = 4 + atoi(n.c_str());
 					}
+
+					/*log test*/
+					/*
+					if (attr_index != -1 && it->first.find("TEXCOORD_") != std::string::npos) {
+						int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+						assert(byteStride != -1);
+
+						n_vert = (int)accessor.count;
+						int n_comp = accessor.type;
+
+						size_t buffer = model.bufferViews[accessor.bufferView].buffer;
+						size_t bufferviewOffset = model.bufferViews[accessor.bufferView].byteOffset;
+
+						float* uv_ptr = (float*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset];
+						for (int i = 0; i < n_vert; ++i) {
+							std::cout << "UV[" << i << "]: (" << *(uv_ptr + i * 2) << ", " << *(uv_ptr + i * 2 + 1) << ")" << std::endl;
+						}
+					}*/
+					/*end log test*/
 
 					if (attr_index != -1) {
 
@@ -119,27 +138,28 @@ struct gltf_loader {
 							accessor.ByteStride(model.bufferViews[accessor.bufferView]);
 						assert(byteStride != -1);
 
-						n_vert = (int) accessor.count;
+						n_vert = (int)accessor.count;
 						int n_comp = accessor.type; // only consider vec2, vec3 and vec4 (TINYGLTF_TYPE_VEC* ) 
 
 						size_t buffer = model.bufferViews[accessor.bufferView].buffer;
 						size_t bufferviewOffset = model.bufferViews[accessor.bufferView].byteOffset;
 
 						switch (accessor.componentType) {
-							case TINYGLTF_PARAMETER_TYPE_FLOAT: r.add_vertex_attribute<float>((float*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset], n_comp * n_vert, attr_index, n_comp);break;
-							case TINYGLTF_PARAMETER_TYPE_BYTE: r.add_vertex_attribute<char>((char*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset], n_comp * n_vert, attr_index, n_comp);break;
-							case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: r.add_vertex_attribute<unsigned char>((unsigned char*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset], n_comp * n_vert, attr_index, n_comp);break;
+						case TINYGLTF_PARAMETER_TYPE_FLOAT: r.add_vertex_attribute<float>((float*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset], n_comp * n_vert, attr_index, n_comp); break;
+						case TINYGLTF_PARAMETER_TYPE_BYTE: r.add_vertex_attribute<char>((char*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset], n_comp * n_vert, attr_index, n_comp); break;
+						case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: r.add_vertex_attribute<unsigned char>((unsigned char*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset], n_comp * n_vert, attr_index, n_comp); break;
 						}
 						// if the are the position compute the object bounding box
 						if (attr_index == 0) {
-							float * v_ptr = (float*)& model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset];
-							for (  int iv = 0; iv < n_vert; ++iv)
+							float* v_ptr = (float*)&model.buffers[buffer].data[bufferviewOffset + accessor.byteOffset];
+							for (int iv = 0; iv < n_vert; ++iv)
 								r.bbox.add(glm::vec3(*(v_ptr + iv * 3), *(v_ptr + iv * 3 + 1), *(v_ptr + iv * 3 + 2)));
 						}
 					}
 				}
 
-				const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
+				const tinygltf::Accessor& indexAccessor =
+					model.accessors[primitive.indices];
 
 				int mode = -1;
 				if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
@@ -165,7 +185,8 @@ struct gltf_loader {
 				}
 
 				// Compute byteStride from Accessor + BufferView combination.
-				int byteStride = indexAccessor.ByteStride(model.bufferViews[indexAccessor.bufferView]);
+				int byteStride =
+					indexAccessor.ByteStride(model.bufferViews[indexAccessor.bufferView]);
 				assert(byteStride != -1);
 
 				// one long texture, just a stub implementation
@@ -177,8 +198,8 @@ struct gltf_loader {
 				check_gl_errors(__LINE__, __FILE__);
 				switch (indexAccessor.componentType) {
 				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:     r.add_indices<unsigned char>((unsigned char*)&model.buffers[buffer].data[bufferviewOffset + indexAccessor.byteOffset], (unsigned int)indexAccessor.count, GL_TRIANGLES); break;
-				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:    r.add_indices<unsigned short>((unsigned short*)&model.buffers[buffer].data[bufferviewOffset + indexAccessor.byteOffset], (unsigned int) indexAccessor.count, GL_TRIANGLES); break;
-				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:      r.add_indices<unsigned int>((unsigned int*)&model.buffers[buffer].data[bufferviewOffset + indexAccessor.byteOffset], (unsigned int) indexAccessor.count, GL_TRIANGLES); break;
+				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:    r.add_indices<unsigned short>((unsigned short*)&model.buffers[buffer].data[bufferviewOffset + indexAccessor.byteOffset], (unsigned int)indexAccessor.count, GL_TRIANGLES); break;
+				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:      r.add_indices<unsigned int>((unsigned int*)&model.buffers[buffer].data[bufferviewOffset + indexAccessor.byteOffset], (unsigned int)indexAccessor.count, GL_TRIANGLES); break;
 				}
 
 				check_gl_errors(__LINE__, __FILE__);
@@ -186,9 +207,9 @@ struct gltf_loader {
 				// setup the material
 				tinygltf::Material mat = model.materials[primitive.material];
 				int index;
-				
+
 				index = mat.pbrMetallicRoughness.baseColorTexture.index;
-				r.mater.base_color_texture = (index != -1)?this->id_textures[index]: this->id_textures[0];
+				r.mater.base_color_texture = (index != -1) ? this->id_textures[index] : this->id_textures[0];
 
 				index = mat.normalTexture.index;
 				r.mater.normal_texture = (index != -1) ? this->id_textures[index] : -1;
@@ -209,11 +230,11 @@ struct gltf_loader {
 		}
 	}
 
-    // take a model and fill the buffers to be passed to the compute shader (for ray tracing)
-	bool create_renderable(std::vector<renderable> & _renderable, box3 & bbox) {
+	// take a model and fill the buffers to be passed to the compute shader (for ray tracing)
+	bool create_renderable(std::vector<renderable>& _renderable, box3& bbox) {
 
 		unsigned char* _data_vert[2] = { 0,0 };
-		unsigned char * _data = 0;
+		unsigned char* _data = 0;
 		tinygltf::Mesh* mesh_ptr = 0;
 		assert(model.scenes.size() > 0);
 
@@ -246,7 +267,7 @@ struct gltf_loader {
 			int  channels_in_file;
 			stbi_uc* data = stbi_load_from_memory(v_ptr, bufferview.byteLength, &x, &y, &channels_in_file, image.component);
 
-//			stbi_write_png("read_texture.png", x, y, 4, data, 0);
+			//			stbi_write_png("read_texture.png", x, y, 4, data, 0);
 
 			id_textures.push_back(0);
 			glGenTextures(1, &id_textures.back());
@@ -275,16 +296,17 @@ struct gltf_loader {
 		glm::mat4 currT(1.f);
 		visit_node(currT, 0);
 
-		
+
 		for (unsigned int ir = 0; ir < rs.size(); ++ir)
 			for (unsigned int ic = 0; ic < 8; ++ic)
-				bbox.add(rs[ir].transform*glm::vec4(rs[ir].bbox.p(ic),1.0));
+				bbox.add(rs[ir].transform * glm::vec4(rs[ir].bbox.p(ic), 1.0));
 		_renderable = rs;
- 		return true;
+		return true;
 	}
 
-	void load_to_renderable(std::string input_filename, std::vector<renderable> & _renderable, box3 & bbox) {
+	void load_to_renderable(std::string input_filename, std::vector<renderable>& _renderable, box3& bbox) {
 		load(input_filename);
 		create_renderable(_renderable, bbox);
 	}
+
 };

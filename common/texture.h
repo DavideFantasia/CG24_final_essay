@@ -12,23 +12,26 @@ struct texture {
 	~texture() {  }
 
 	int x_size, y_size;
+	int tu;
 	int n_components;
 	unsigned char* pixelData;
 	GLuint id;
-	GLuint load(std::string name, GLuint tu, bool isGammaCorrected) {
+	GLuint load(std::string name, GLuint _tu, bool isGammaCorrected) {
 		unsigned char* data;
 		data = stbi_load(name.c_str(), &x_size, &y_size, &n_components, 0);
 		stbi__vertical_flip(data, x_size, y_size, n_components);
+		tu = _tu;
 		glActiveTexture(GL_TEXTURE0 + tu);
 		glGenTextures(1, &id);
 		glBindTexture(GL_TEXTURE_2D, id);
 		int channels;
 		int internalFormat;
+		std::cout << name << std::endl;
 		switch (n_components) {
 			case 1: internalFormat = channels = GL_RED; break;
 			case 3: channels = GL_RGB; internalFormat = isGammaCorrected ? GL_SRGB : GL_RGB; break;
 			case 4: channels = GL_RGBA; internalFormat = isGammaCorrected ? GL_SRGB_ALPHA : GL_RGBA; break;
-			default: assert(0);
+			default: std::cout << n_components << std::endl; assert(0);
 		}
 		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, x_size, y_size, 0, channels, GL_UNSIGNED_BYTE, data);
 		//stbi_image_free(data);

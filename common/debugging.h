@@ -53,8 +53,11 @@ static bool check_gl_errors(int line, const char* file, bool exit_on_error = tru
 		break;
 	}
 	bool ok_res = (err == GL_NO_ERROR);
-	if (!ok_res  && exit_on_error)
-		exit(0);
+	if (!ok_res && exit_on_error){
+		std::string test;
+		std::cin >> test;
+		exit(-1);
+	}
 	return ok_res;
 }
 
