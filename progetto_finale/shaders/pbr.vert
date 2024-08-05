@@ -22,13 +22,19 @@ uniform float uTextureRep;
 uniform mat4 uSunLightSpaceMatrix;
 uniform mat4 uLampLightSpaceMatrix;
 
+uniform int has_heightmap; 
 
 void main(void)
 {
-    float height = texture2D(uColorImage,aTexCoord*uTextureRep).r * uHeightScale;
-    vec3 newPosition = vec3(aPosition.x, aPosition.y+height, aPosition.z);
-
+    vec3 newPosition;
+    if(has_heightmap == 1){
+        float height = texture2D(uColorImage,aTexCoord*uTextureRep).r * uHeightScale;
+        newPosition = vec3(aPosition.x, aPosition.y+height, aPosition.z);
+    }else
+        newPosition = vec3(aPosition.x, aPosition.y, aPosition.z);
+    
     vTexCoord = aTexCoord;
+
     vColor = aColor;
 	vPos = vec3((uModel*vec4(newPosition, 1.0)));
     vPosSunLightSpace = uSunLightSpaceMatrix * vec4(vPos, 1.0);

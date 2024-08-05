@@ -40,6 +40,7 @@ struct Material {
 	vec3 diffuse_factor;
 	float metallic_factor;
 	float roughness_factor;
+	float ao_factor;
 
 	sampler2D diffuse_map;
 	int has_diffuse_map;
@@ -49,8 +50,8 @@ struct Material {
 	int has_roughness_map;
 	sampler2D normal_map;
 	int has_normal_map;
-
-	float ao;
+	sampler2D ao_map;
+	int has_ao_map;
 };
 
 uniform Material material;
@@ -58,6 +59,24 @@ uniform vec3 uViewPos;
 uniform sampler2D uSunShadowMap;
 uniform sampler2D uLampShadowMap;
 uniform float uBias;
+
+vec3 getNormalFromMap()
+{
+    //vec3 tangentNormal = normalize(texture(material.normal_map, vTexCoord).xyz * 2.0 - 1.0);
+	vec3 tangentNormal = texture(material.normal_map, vTexCoord).xyz * 2.0 - 1.0;
+    vec3 Q1  = dFdx(vPos);
+    vec3 Q2  = dFdy(vPos);
+    vec2 st1 = dFdx(vTexCoord);
+    vec2 st2 = dFdy(vTexCoord);
+
+    vec3 N   = normalize(cross(dFdx(vPos),dFdy(vPos)));
+    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 B  = -normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * tangentNormal);
+	//return tangentNormal;
+}
 
 //funzione per calcolare il fattore di ombra nel frammento
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir, int shadowSample, sampler2D shadowMap){
@@ -138,13 +157,13 @@ void main(void)
 	//check for the textures (maps)
 	vec3 norm; //N
 	if(material.has_normal_map == 1)
-		norm = vec3(texture(material.normal_map, vTexCoord));
+		norm = getNormalFromMap();
 	else
 		norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
 	//diffuse factor
 	vec3 diffuse;
 	if(material.has_diffuse_map == 1)
-		diffuse = vec3(texture(material.diffuse_map, vTexCoord));
+		diffuse = texture(material.diffuse_map, vTexCoord).rgb;
 	else
 		diffuse = vec3(material.diffuse_factor);
 	//roughness
@@ -153,19 +172,24 @@ void main(void)
 		roughness = texture(material.roughness_map, vTexCoord).r;
 	else
 		roughness = material.roughness_factor;
-
 	//metallic
 	float metallic;
 	if(material.has_metallic_map  == 1)
 		metallic = texture(material.metallic_map, vTexCoord).r;
 	else
 		metallic = material.metallic_factor;
+	float ao;
+
+	if(material.has_ao_map == 1)
+		ao = mix(1.0, texture(material.ao_map, vTexCoord).r , material.ao_factor);
+	else
+		ao = material.ao_factor;
 	// ------------------------------------------------------------------------------
 
 	vec3 result = vec3(CalcDirLight(dirLight, viewDir, diffuse, norm, roughness, metallic));
-	result +=  vec3(CalcSpotLight(spotlight, vPos, viewDir, diffuse, norm, roughness, metallic));
+	//result +=  vec3(CalcSpotLight(spotlight, vPos, viewDir, diffuse, norm, roughness, metallic));
 
-	vec3 ambient = spotlight.ambient * diffuse * material.ao;
+	vec3 ambient = spotlight.ambient * diffuse * ao;
 	result += ambient;
 
 	// HDR tonemapping
@@ -174,6 +198,7 @@ void main(void)
 	result = pow(result,vec3(1.0/gamma));
 
 	color = vec4(result, 1.0);
+	//color = vec4(vTexCoord,0.0 ,1.0);
 } 
 
 vec3 CalcDirLight(DirLight light, vec3 viewDir, vec3 diffuse, vec3 normal, float roughness, float metallic){
