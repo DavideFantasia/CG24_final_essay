@@ -34,7 +34,7 @@ public:
     float Zoom;
 
     // Constructor with vectors
-    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = -90.0f, float pitch = 0.0f);
+    Camera(glm::vec3 position = glm::vec3(2.19f, 0.5f, 1.46f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = -138.15f, float pitch = -4.95f);
 
     // Returns the view matrix calculated using Euler Angles and the LookAt Matrix
     glm::mat4 GetViewMatrix();

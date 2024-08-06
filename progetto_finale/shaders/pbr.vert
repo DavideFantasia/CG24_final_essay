@@ -28,11 +28,11 @@ void main(void)
 {
     vec3 newPosition;
     if(has_heightmap == 1){
-        float height = texture2D(uColorImage,aTexCoord*uTextureRep).r * uHeightScale;
+        float height = normalize(texture2D(uColorImage,aTexCoord*uTextureRep)).x * uHeightScale;
         newPosition = vec3(aPosition.x, aPosition.y+height, aPosition.z);
     }else
         newPosition = vec3(aPosition.x, aPosition.y, aPosition.z);
-    
+
     vTexCoord = aTexCoord;
 
     vColor = aColor;

@@ -95,8 +95,8 @@ class SandTerrainMaterial : public Material {
 public:
     SandTerrainMaterial(): Material("sand_terrain") {
         diffuse_factor = glm::vec3(0.94f, 0.80f, 0.49f);
-        metallic_factor = 0.005;
-        roughness_factor = 0.95f;
+        metallic_factor = 0.f;
+        roughness_factor = 1.f;
         ao_factor = 0.05f;
 
         has_diffuse_map = true;
@@ -118,7 +118,7 @@ class BustMaterial : public Material {
 public:
     BustMaterial() : Material("bust_material") {}
 
-    void init(GLint _diffuse_map, GLint _roughness_map, GLint _metallic_map, GLint _normal_map, GLint _ao_map) {
+    void init(GLint _diffuse_map, GLint _roughness_map, GLint _metallic_map, GLint _normal_map) {
         has_diffuse_map = true;
         diffuse_map = _diffuse_map;
 
@@ -131,8 +131,7 @@ public:
         has_normal_map = true;
         normal_map = _normal_map;
 
-        has_ao_map = false; //test
-        ao_map = _ao_map;
+        has_ao_map = false;
         ao_factor = 0.05f;
     }
     void set_shader_uniforms(GLuint shader_program) const override {
@@ -144,15 +143,7 @@ class LampMaterial : public Material {
 public:
     LampMaterial() : Material("lamp_material") {}
 
-    void init(GLint _diffuse_map, GLint _roughness_map, GLint _metallic_map, GLint _normal_map, GLint _ao_map) {
-        /*
-        diffuse_factor = glm::vec3(1.f, 1.f, 1.f);
-        roughness_factor = 0.5f;
-        metallic_factor = 1.f;
-        ao_factor = 0.05f;
-        */
-        has_heightmap = false;
-
+    void init(GLint _diffuse_map, GLint _roughness_map, GLint _metallic_map, GLint _normal_map) {
         has_diffuse_map = true;
         diffuse_map = _diffuse_map;
 
@@ -165,8 +156,7 @@ public:
         has_normal_map = true;
         normal_map = _normal_map;
 
-        has_ao_map = true;
-        ao_map = _ao_map;
+        has_ao_map = false;
         ao_factor = 0.05f;
     }
     void set_shader_uniforms(GLuint shader_program) const override {

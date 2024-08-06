@@ -2,7 +2,7 @@
 
 // Constructor with vectors
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    :Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(2.0f), MouseSensitivity(0.075f), Zoom(45.0f) {
+    :Position(glm::vec3(2.19f,0.5f,1.46f)),Front(glm::vec3(-0.612f, -0.058f, -0.789f)), MovementSpeed(1.75f), MouseSensitivity(0.075f), Zoom(45.0f) {
     Position = position;
     WorldUp = up;
     Yaw = yaw;
@@ -37,7 +37,7 @@ void Camera::ProcessKeyboard(CameraMovement direction, float deltaTime) {
         Position -= Up * velocity;
 
     // Imposta la posizione Y della camera sulla superficie del terreno
-    Position.y = 0.5f;
+    Position.y = 0.25f;
 
     // Aggiorna i vettori della camera
     updateCameraVectors();

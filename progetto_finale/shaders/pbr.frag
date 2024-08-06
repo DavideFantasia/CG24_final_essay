@@ -60,6 +60,8 @@ uniform sampler2D uSunShadowMap;
 uniform sampler2D uLampShadowMap;
 uniform float uBias;
 
+uniform int isNight;
+
 vec3 getNormalFromMap()
 {
     //vec3 tangentNormal = normalize(texture(material.normal_map, vTexCoord).xyz * 2.0 - 1.0);
@@ -90,7 +92,6 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir, int 
 	float closestDepth = texture(shadowMap, projCoords.xy).r;
 	float currentDepth = projCoords.z;
 
-	//check per vedere se siamo in ombra nel frammento attuale
 	float bias = uBias;
 	float shadow = 0.0;
 
@@ -187,7 +188,8 @@ void main(void)
 	// ------------------------------------------------------------------------------
 
 	vec3 result = vec3(CalcDirLight(dirLight, viewDir, diffuse, norm, roughness, metallic));
-	//result +=  vec3(CalcSpotLight(spotlight, vPos, viewDir, diffuse, norm, roughness, metallic));
+	if(isNight == 1)
+		result +=  vec3(CalcSpotLight(spotlight, vPos, viewDir, diffuse, norm, roughness, metallic));
 
 	vec3 ambient = spotlight.ambient * diffuse * ao;
 	result += ambient;
@@ -195,6 +197,7 @@ void main(void)
 	// HDR tonemapping
     result = result / (result + vec3(1.0));
 
+	//Gamma Correction
 	result = pow(result,vec3(1.0/gamma));
 
 	color = vec4(result, 1.0);
@@ -236,8 +239,7 @@ vec3 CalcDirLight(DirLight light, vec3 viewDir, vec3 diffuse, vec3 normal, float
 	// scale light by NdotL
     float NdotL = max(dot(normal, L), 0.0);     
 	
-	//float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir, 2);
-	float shadow = ShadowCalculation(vPosSunLightSpace, normal, viewDir, 2, uSunShadowMap);
+	float shadow = ShadowCalculation(vPosSunLightSpace, normal, viewDir, 3, uSunShadowMap);
 
 	// add to outgoing radiance Lo
     return (kD * diffuse / PI + specular) * radiance * NdotL * (1.0-shadow);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
