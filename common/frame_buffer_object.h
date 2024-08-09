@@ -82,7 +82,8 @@
 			{	/* render buffer for depth  attachment*/
 				glGenRenderbuffers(1, &this->id_depth);
 				glBindRenderbuffer(GL_RENDERBUFFER, this->id_depth);
-				glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+				//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+				glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, w, h);
 				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, this->id_depth);
 			}
 			check_gl_errors(__LINE__, __FILE__, true);

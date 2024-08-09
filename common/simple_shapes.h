@@ -3,6 +3,8 @@
 #include "renderable.h"
 #include <glm/ext.hpp>  
 #include <glm/gtx/string_cast.hpp>
+#include <cmath>
+#include <algorithm>
 
 class shape {
 public:
@@ -440,6 +442,70 @@ struct shape_maker {
 		return s;
 	}
 
+	static void adaptive_terrain(shape& s, unsigned int nX, unsigned int nY) {
+		// Calcola la densità massima al centro
+		float maxDensity = 1.0f; // Densità massima al centro
+		float minDensity = 0.5f; // Densità minima ai bordi
+
+		// Crea i vertici e le coordinate di texture
+		s.positions.resize(3 * (nX + 1) * (nY + 1));
+		s.texcoords.resize(2 * (nX + 1) * (nY + 1));
+
+		for (unsigned int i = 0; i < nX + 1; ++i) {
+			for (unsigned int j = 0; j < nY + 1; ++j) {
+				// Coordinate normalizzate
+				float x = -1.f + 2 * i / float(nX);
+				float z = -1.f + 2 * j / float(nY);
+
+				// Calcola la densità basata sulla distanza dal centro
+				float distX = std::abs(x);
+				float distZ = std::abs(z);
+				float distance = std::max(distX, distZ);
+				float density = glm::mix(minDensity, maxDensity, 1.0f - distance);
+
+				// Applica la densità per aumentare la risoluzione verso il centro
+				s.positions[3 * (j * (nX + 1) + i) + 0] = x * density;
+				s.positions[3 * (j * (nX + 1) + i) + 1] = 0.f; // Altitudine iniziale
+				s.positions[3 * (j * (nX + 1) + i) + 2] = z * density;
+
+				// Coordinate di texture
+				s.texcoords[2 * (j * (nX + 1) + i) + 0] = (x + 1.0f) / 2.0f;
+				s.texcoords[2 * (j * (nX + 1) + i) + 1] = (z + 1.0f) / 2.0f;
+			}
+		}
+
+		// Normali iniziali
+		for (unsigned int i = 0; i < s.positions.size() / 3; ++i) {
+			s.normals.push_back(0.0f);
+			s.normals.push_back(1.0f);
+			s.normals.push_back(0.0f);
+		}
+
+		// Crea gli indici per i triangoli
+		for (unsigned int i = 0; i < nX; ++i) {
+			for (unsigned int j = 0; j < nY; ++j) {
+				s.indices_triangles.push_back(j * (nX + 1) + i);
+				s.indices_triangles.push_back(j * (nX + 1) + i + 1);
+				s.indices_triangles.push_back((j + 1) * (nX + 1) + i + 1);
+
+				s.indices_triangles.push_back(j * (nX + 1) + i);
+				s.indices_triangles.push_back((j + 1) * (nX + 1) + i + 1);
+				s.indices_triangles.push_back((j + 1) * (nX + 1) + i);
+			}
+		}
+
+		// Numero di vertici e facce
+		s.vn = static_cast<unsigned int>(s.positions.size() / 3);
+		s.fn = static_cast<unsigned int>(s.indices_triangles.size() / 3);
+	}
+
+
+
+	static shape adaptive_terrain(unsigned int nX, unsigned int nY) {
+		shape s;
+		adaptive_terrain(s, nX, nY);
+		return s;
+	}
 
 	static int pos(int i, int j, int stacks) {
 		return j*(stacks + 1) + i;

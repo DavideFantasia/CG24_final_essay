@@ -39,16 +39,9 @@ struct texture {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glGenerateMipmap(GL_TEXTURE_2D);
 		return id;
-	}
-
-	// metodo di test per caricare solo i dati della heightmap per la camera
-	void loadHeightMap(){
-		std::string name = "./textures/terrain/height_map_blurred.png";
-		pixelData = stbi_load(name.c_str(), &x_size, &y_size, &n_components, 0);
-		stbi__vertical_flip(pixelData, x_size, y_size, n_components);
 	}
 
 	GLuint create(int x_size, int y_size, GLuint channels) {
