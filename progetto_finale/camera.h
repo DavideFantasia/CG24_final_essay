@@ -54,7 +54,6 @@ public:
     //return y from heightmap, given x and z
     float TerrainHeight(float x, float z);
 
-private:
     // Calculates the front vector from the Camera's (updated) Euler Angles
     void updateCameraVectors();
 };

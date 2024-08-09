@@ -61,7 +61,8 @@ void processInput(GLFWwindow* window);
 /*---------------- texture ----------------*/
 //texture per il terreno
 texture heightmap, sandTexture;
-char heightmap_name[256] = { "./textures/terrain/height_map.png" };
+//char heightmap_name[256] = { "./textures/terrain/height_map.png" };
+char heightmap_name[256] = { "./textures/terrain/test_blur.png" };
 char sandTexture_name[256] = { "./textures/terrain/sand_texture.jpg" };
 
 //texture del busto del david
@@ -148,9 +149,9 @@ glm::mat4 view;
 
 /* program shaders used */
 shader lighting_shader, skybox_shader, fsq_shader, uv_shader, depth_shader;
-float heightmapScale = 2.f; //scale of the dune height (heightmap scale value)
-float heightmapRep = 1.f; //repetition of the heightmap on the heightmap
-float terrain_lato = 10.f; //dimensione del lato del terreno (10 = max)
+float heightmapScale = 1.65f; //scale of the dune height (heightmap scale value)
+float heightmapRep = 0.75f; //repetition of the heightmap on the heightmap
+float terrain_lato = 10.f*heightmapScale; //dimensione del lato del terreno (10 = max)
 
 /* object that will be rendered in this scene*/
 renderable r_terrain;
@@ -325,10 +326,10 @@ int main(void)
 	/* Transformation to setup the point of view on the scene */
 
 	load_textures();
-	updateCameraHeight(2.19f, 1.46f);
-	cameraPositions.push_back(glm::vec3(2.19f, camera.Position.y, 1.46f));
-	updateCameraHeight(3.f, 3.f);
-	cameraPositions.push_back(glm::vec3(camera.Position.x, camera.Position.y, camera.Position.z));
+	updateCameraHeight(2.045f, 1.266f);
+	cameraPositions.push_back(glm::vec3(2.045f, camera.Position.y, 1.266f));
+	updateCameraHeight(-1.062f, 1.518f);
+	cameraPositions.push_back(glm::vec3(-1.062f, camera.Position.y, 1.518f));
 	
 	proj = glm::perspective(glm::radians(camera.Zoom), width / float(height), 0.25f, 10.f);
 	view = camera.GetViewMatrix();
@@ -341,7 +342,7 @@ int main(void)
 	lampProjector.sm_size_x = 1924;
 	lampProjector.sm_size_y = 1924;
 
-	depth_bias = 0.0025f;
+	depth_bias = 0.0009f;
 	distance_light = 10;
 
 	/* ----------- Passaggio Uniform per la creazione del Terrain ----------------*/
@@ -356,10 +357,10 @@ int main(void)
 	sun = sun.directional_init(glm::vec3(0.f, -1.f, 0.f));
 	sun.set_uniform(lighting_shader.program);
 
-	glm::vec4 spotLight_position = glm::translate(glm::mat4(1.f),glm::vec3(-0.24f,0.f,0.24f))*glm::vec4(0.498f, 2.f, -1.042f, 1.f);
+	glm::vec4 spotLight_position = glm::vec4(0.498f, 1.9f, -1.042f, 1.f);
 	glm::vec4 spotLight_direction = glm::normalize(-glm::vec4(0.029f, 0.635f, -0.770f, 0.f));
 
-	spotLight = spotLight.spotlight_init(glm::vec3(spotLight_position.x,spotLight_position.y,spotLight_position.z), glm::vec3(spotLight_direction.x, spotLight_direction.y, spotLight_direction.z), 35.f, 45.f);
+	spotLight = spotLight.spotlight_init(glm::vec3(spotLight_position.x,spotLight_position.y,spotLight_position.z), glm::vec3(spotLight_direction.x, spotLight_direction.y, spotLight_direction.z), 15.f, 25.f);
 	spotLight.set_uniform(lighting_shader.program);
 	
 	lamp_bulb = lamp_bulb.pointLight_init(glm::vec3(spotLight_position));
@@ -409,6 +410,7 @@ int main(void)
 	
 	/* ------------------ RENDER LOOP ---------------------------*/
 	while (!glfwWindowShouldClose(window)){
+
 		/* Render here */
 		glClearColor(0.8f, 0.8f, 0.9f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -545,7 +547,7 @@ glm::mat4 render_gltf(shader shader, bool isLightShader, std::vector<renderable>
 			float height_value = heightmap.heightFunction(obj[i].transform[3][0], obj[i].transform[3][2], heightmapRep);
 
 			//float new_y = r_terrain.transform[3][1] + (height_value * heightmapScale);
-			float new_y = 0.25f + (height_value * heightmapScale);
+			float new_y = 0.07f + (height_value * heightmapScale);
 			glm::mat4 terrain_level = glm::translate(glm::mat4(1.f), glm::vec3(0.f, new_y, 0.f));
 		
 			obj[i].bind();
@@ -604,9 +606,15 @@ void processInput(GLFWwindow* window) {
 	//switch camera position
 	if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS){
 		camera.SwitchPosition(cameraPositions[0]);
+		camera.Yaw = -137.025f;
+		camera.Pitch = 2.1;
+		camera.updateCameraVectors();
 	}
 	if(glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
 		camera.SwitchPosition(cameraPositions[1]);
+		camera.Yaw = -57.75f;
+		camera.Pitch = -1.425;
+		camera.updateCameraVectors();
 	}
 }
 
@@ -643,7 +651,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 /* funzione che aggiorna la posizione (valore y) della camera seguendo l'altezza delle dune */
 float updateCameraHeight(float x, float z) {
 	float heightValue = heightmap.heightFunction(x, z, heightmapRep);
-	float new_y = 0.75f + (heightValue * heightmapScale);
+	float new_y = 0.5f + (heightValue * heightmapScale);
 	camera.Position.y = new_y;
 	return new_y;
 }
