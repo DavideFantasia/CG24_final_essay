@@ -22,14 +22,19 @@ public:
     float cutOff;
     float outerCutOff;
 
-    bool is_spotlight;
+    enum class TypeOfLight {
+        SPOT_LIGHT,
+        DIRECTIONAL_LIGHT,
+        POINT_LIGHT
+    };
+
+    TypeOfLight type_of_light;
 
     // Constructor
     Light()
         : position(0.0f), direction(0.0f), ambient(0.2f), diffuse(0.5f), specular(0.65f),
         constant(1.0f), linear(0.09f), quadratic(0.032f),
-        cutOff(glm::cos(glm::radians(12.5f))), outerCutOff(glm::cos(glm::radians(15.0f))),
-        is_spotlight(false) {}
+        cutOff(glm::cos(glm::radians(12.5f))), outerCutOff(glm::cos(glm::radians(15.0f))){}
 
     // Static methods to initialize lights
     static Light directional_init(const glm::vec3& direction) {
@@ -41,17 +46,38 @@ public:
         light.diffuse = glm::vec3(1.0f, 0.95f, 0.8f);
         light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
-        light.is_spotlight = false;
+        light.type_of_light = TypeOfLight::DIRECTIONAL_LIGHT;
+        return light;
+    }
+
+    static Light pointLight_init(const glm::vec3& position) {
+        Light light;
+
+        light.ambient = glm::vec3(0.05, 0.05, 0.04);
+        light.diffuse = glm::vec3(0.9, 0.8, 0.7);
+        light.specular = glm::vec3(1.0, 0.9, 0.8);
+
+        light.constant = 1.f;
+        light.linear = 5.f;
+        light.quadratic = 5.f;
+
+        light.position = position;
+        light.type_of_light = TypeOfLight::POINT_LIGHT;
         return light;
     }
 
     static Light spotlight_init(const glm::vec3& position, const glm::vec3& direction, float angle_cutoff, float angle_outerCutOff) {
         Light light;
+
+        light.ambient = glm::vec3(0.05, 0.05, 0.04);
+        light.diffuse = glm::vec3(0.9, 0.8, 0.7);
+        light.specular = glm::vec3(1.0, 0.9, 0.8);
+
         light.position = position;
         light.direction = direction;
         light.cutOff = glm::cos(glm::radians(angle_cutoff));
         light.outerCutOff = glm::cos(glm::radians(angle_outerCutOff));
-        light.is_spotlight = true;
+        light.type_of_light = TypeOfLight::SPOT_LIGHT;
         return light;
     }
 
@@ -81,13 +107,11 @@ public:
     // Set uniform method
     void set_uniform(GLuint shaderProgram) {
         std::string uniformNameBase;
-        if (is_spotlight) {
-            uniformNameBase = "spotlight";
-            set_spotlight_uniforms(shaderProgram, uniformNameBase);
-        }
-        else {
-            uniformNameBase = "dirLight";
-            set_directional_uniforms(shaderProgram, uniformNameBase);
+        switch(type_of_light){
+            case(TypeOfLight::SPOT_LIGHT): uniformNameBase = "spotlight"; set_spotlight_uniforms(shaderProgram, uniformNameBase); break;
+            case(TypeOfLight::DIRECTIONAL_LIGHT): uniformNameBase = "dirLight"; set_directional_uniforms(shaderProgram, uniformNameBase); break;
+            case(TypeOfLight::POINT_LIGHT): uniformNameBase = "pointLight"; set_pointlight_uniforms(shaderProgram, uniformNameBase); break;
+            default: exit(-2);
         }
     }
 
@@ -98,6 +122,18 @@ private:
         glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".ambient").c_str()), 1, glm::value_ptr(ambient));
         glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".diffuse").c_str()), 1, glm::value_ptr(diffuse));
         glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".specular").c_str()), 1, glm::value_ptr(specular));
+    }
+
+    void set_pointlight_uniforms(GLuint shaderProgram, const std::string& uniformNameBase){
+        glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".position").c_str()), 1, glm::value_ptr(position));
+
+        glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".ambient").c_str()), 1, glm::value_ptr(ambient));
+        glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".diffuse").c_str()), 1, glm::value_ptr(diffuse));
+        glUniform3fv(glGetUniformLocation(shaderProgram, (uniformNameBase + ".specular").c_str()), 1, glm::value_ptr(specular));
+
+        glUniform1f(glGetUniformLocation(shaderProgram, (uniformNameBase + ".constant").c_str()), constant);
+        glUniform1f(glGetUniformLocation(shaderProgram, (uniformNameBase + ".linear").c_str()), linear);
+        glUniform1f(glGetUniformLocation(shaderProgram, (uniformNameBase + ".quadratic").c_str()), quadratic);
     }
 
     void set_spotlight_uniforms(GLuint shaderProgram, const std::string& uniformNameBase) {

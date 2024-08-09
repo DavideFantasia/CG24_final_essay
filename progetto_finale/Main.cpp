@@ -61,12 +61,12 @@ void processInput(GLFWwindow* window);
 /*---------------- texture ----------------*/
 //texture per il terreno
 texture heightmap, sandTexture;
-//char heightmap_name[256] = { "./textures/terrain/height_map_blurred.png" };
 char heightmap_name[256] = { "./textures/terrain/height_map.png" };
 char sandTexture_name[256] = { "./textures/terrain/sand_texture.jpg" };
+
 //texture del busto del david
 texture diffuse_david, roughness_david, metallic_david, normal_david, ao_david, uv_david;
-texture diffuse_lamp, roughness_lamp, metallic_lamp, normal_lamp, ao_lamp;
+texture diffuse_lamp, roughness_lamp, metallic_lamp, normal_lamp, ao_lamp, emissive_lamp;
 //texture per lo skybox
 texture daySkybox, nightSkybox;
 //indice delle texture
@@ -85,6 +85,8 @@ texture daySkybox, nightSkybox;
 * id 9: lamp roughness
 * id 10: lamp metallic
 * id 11: lamp normal
+* id 12: lamp emissive map
+* id 13: lamp ao
 
 * ------
 * id 20: shadowmap del sole, con scopo di shadow mapping
@@ -111,11 +113,14 @@ void load_textures() {
 	normal_david.load(path + "normal_tangent.png", 7, false);
 
 	//texture del lampione
-	path = "./models/lamp/textures/";
+	//path = "./models/lamp/textures/";
+	path = "./models/lamp_v2/textures/";
 	diffuse_lamp.load(path + "diffuse.png", 8, true);
-	roughness_lamp.load(path + "roughness.png", 9, false);
-	metallic_lamp.load(path + "metallic.png", 10, false);
+	roughness_lamp.load(path + "roughness.png", 9, true);
+	metallic_lamp.load(path + "metallic.png", 10, true);
 	normal_lamp.load(path + "normal_tangent.png", 11, false);
+	emissive_lamp.load(path + "emit.png", 12, false);
+	ao_lamp.load(path + "ao.png", 13, false);
 
 	std::cout << "texture caricate correttamente" << std::endl;
 }
@@ -145,6 +150,7 @@ glm::mat4 view;
 shader lighting_shader, skybox_shader, fsq_shader, uv_shader, depth_shader;
 float heightmapScale = 2.f; //scale of the dune height (heightmap scale value)
 float heightmapRep = 1.f; //repetition of the heightmap on the heightmap
+float terrain_lato = 10.f; //dimensione del lato del terreno (10 = max)
 
 /* object that will be rendered in this scene*/
 renderable r_terrain;
@@ -225,8 +231,11 @@ struct projector {
 	int sm_size_x, sm_size_y;
 };
 projector sunProjector, lampProjector;
+Light spotLight, lamp_bulb, sun;
 
-void render_gltf(shader shader, bool isLightShader, std::vector<renderable> obj, box3 bbox, glm::mat4 global_position); //function to render a single gltf/glb model
+
+//function to render a single gltf/glb model, return the global matrix of the model
+glm::mat4 render_gltf(shader shader, bool isLightShader, std::vector<renderable> obj, box3 bbox, glm::mat4 global_position);
 void renderScene(shader shader, bool isLightShader); //function to render the whole scene
 
 matrix_stack stack;
@@ -250,6 +259,7 @@ int main(void)
 		glfwTerminate();
 		return -1;
 	}
+	glfwWindowHint(GLFW_SAMPLES, 4);  // 4x MSAA
 
 	glfwSetWindowSizeCallback(window, window_size_callback);
 	//callback della camera
@@ -284,7 +294,6 @@ int main(void)
 
 	/* Set the uT matrix to Identity */
 	glUseProgram(lighting_shader.program);
-	glUniformMatrix4fv(lighting_shader["uModel"], 1, GL_FALSE, &glm::mat4(1.0)[0][0]);
 	glUniform1f(lighting_shader["uHeightScale"], heightmapScale); // Imposta il valore desiderato per la scala delle dune
 	glUniform1f(lighting_shader["uTextureRep"], heightmapRep); // Imposta il numero di ripetizioni della texture
 	glUseProgram(0);
@@ -302,20 +311,15 @@ int main(void)
 	gltf_loader gltfLoader_1, gltfLoader_2;
 
 	gltfLoader_1.load_to_renderable("./models/bust/bust.glb", bust_r, bust_box);
-	gltfLoader_2.load_to_renderable("./models/lamp/street_light.glb", lamp_r, lamp_box);
+	gltfLoader_2.load_to_renderable("./models/lamp_v2/street_lamp.glb", lamp_r, lamp_box);
 
-	bust_model_mat = glm::translate(glm::mat4(1.f), glm::vec3(0.5f, 0.5f, 0.f));
-	lamp_model_mat = glm::translate(glm::mat4(1.f), glm::vec3(0.75f, 0.2f, -0.75f));
+	bust_model_mat = glm::translate(glm::mat4(1.f), glm::vec3(0.5f, 0.35f, 0.f));
+	lamp_model_mat = glm::translate(glm::mat4(1.f), glm::vec3(0.25f, 0.25f, -0.25f)) * glm::rotate(glm::mat4(1.f), glm::radians(-20.f), glm::vec3(1.f, 0.f, 0.f)) *  glm::rotate(glm::mat4(1.f), glm::radians(90.f), glm::vec3(0.f, 1.f, 0.f)) * glm::scale(glm::mat4(1.f), glm::vec3(1.25f, 1.25f, 1.25f));
 
 	for (int i = 0; i < bust_r.size(); i++) {
-		bust_r[i].transform = glm::rotate(bust_r[i].transform, glm::radians(20.f), glm::vec3(0.f, 0.f, 1.f));
+		bust_r[i].transform = glm::rotate(bust_r[i].transform, glm::radians(90.f), glm::vec3(0.f, 1.f, 0.f));
+		bust_r[i].transform = glm::rotate(bust_r[i].transform, glm::radians(30.f), glm::vec3(0.f, 0.f, 1.f));
 	}
-	for (int i = 0; i < lamp_r.size(); i++) {
-		lamp_r[i].transform = glm::rotate(lamp_r[i].transform, glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f));
-		lamp_r[i].transform = glm::rotate(lamp_r[i].transform, glm::radians(-45.f), glm::vec3(0.f, 0.f, 1.f));
-		lamp_r[i].transform = glm::rotate(lamp_r[i].transform, glm::radians(-25.f), glm::vec3(0.f, 1.f, 0.f));
-	}
-	
 	// --------------------------------------------------------------------------------------------------------------
 
 	/* Transformation to setup the point of view on the scene */
@@ -337,7 +341,7 @@ int main(void)
 	lampProjector.sm_size_x = 1924;
 	lampProjector.sm_size_y = 1924;
 
-	depth_bias = 0.005f;
+	depth_bias = 0.0025f;
 	distance_light = 10;
 
 	/* ----------- Passaggio Uniform per la creazione del Terrain ----------------*/
@@ -348,21 +352,25 @@ int main(void)
 	/*-------- Passaggio ID delle texture alla Shader ----------*/
 	glUniform1i(lighting_shader["uColorImage"], 0);
 
-
 	/* ---------------- creazione e passaggio informazioni sulle luci --------------------*/
-	Light sun = sun.directional_init(glm::vec3(0.f, -1.f, 0.f));
+	sun = sun.directional_init(glm::vec3(0.f, -1.f, 0.f));
 	sun.set_uniform(lighting_shader.program);
 
-	glm::vec4 spotLight_position = (glm::vec4(1.32f, 3.f, -0.60f, 0.f));
-	Light spotLight = spotLight.spotlight_init(glm::vec3(spotLight_position.x,spotLight_position.y,spotLight_position.z), glm::vec3(-0.75f, -1.26f, 0.62f), 5.f, 15.f);
+	glm::vec4 spotLight_position = glm::translate(glm::mat4(1.f),glm::vec3(-0.24f,0.f,0.24f))*glm::vec4(0.498f, 2.f, -1.042f, 1.f);
+	glm::vec4 spotLight_direction = glm::normalize(-glm::vec4(0.029f, 0.635f, -0.770f, 0.f));
+
+	spotLight = spotLight.spotlight_init(glm::vec3(spotLight_position.x,spotLight_position.y,spotLight_position.z), glm::vec3(spotLight_direction.x, spotLight_direction.y, spotLight_direction.z), 35.f, 45.f);
 	spotLight.set_uniform(lighting_shader.program);
 	
+	lamp_bulb = lamp_bulb.pointLight_init(glm::vec3(spotLight_position));
+	lamp_bulb.set_uniform(lighting_shader.program);
+
 	glUniform3fv(lighting_shader["uViewPos"], 1, &camera.Position[0]);
 	glUniform1f(lighting_shader["uBias"], depth_bias);
 	
 	check_gl_errors(__LINE__, __FILE__, true);
 
-	/* -------- Passaggio Uniform alla Texture Shader ------------*/
+	/* -------- Passaggio Uniform alla skybox Shader ------------*/
 	glUseProgram(skybox_shader.program);
 	glUniform1i(skybox_shader["uDaySkybox"], 2);
 	glUniform1i(skybox_shader["uNightSkybox"], 3);
@@ -383,8 +391,9 @@ int main(void)
 
 	renderable r_cube = shape_maker::cube();
 	
+	//creazione del materiale dei modelli sulla base delle texture caricate
 	bust_material.init(diffuse_david.tu,roughness_david.tu,metallic_david.tu,normal_david.tu);
-	lamp_material.init(diffuse_lamp.tu,roughness_lamp.tu,metallic_lamp.tu,normal_lamp.tu);
+	lamp_material.init(diffuse_lamp.tu,roughness_lamp.tu,metallic_lamp.tu,normal_lamp.tu,emissive_lamp.tu, ao_lamp.tu);
 
 	/*---- attesa fine generazione del terreno e caricamento modello -----*/
 	terraingeneration_thread.join();
@@ -392,16 +401,14 @@ int main(void)
 	s_plane.to_renderable(r_terrain);
 	r_quad = shape_maker::quad();
 	//matrice di modello del terreno
-	r_terrain.transform *= glm::scale(glm::mat4(1.f), glm::vec3(10.f, heightmapScale, 10.f));
+	r_terrain.transform *= glm::scale(glm::mat4(1.f), glm::vec3(terrain_lato, heightmapScale, terrain_lato));
 
 	float dayNight_rotation_angle = 0.f;
 	float dayNight_rotation_speed = 10.0f; // velocità di rotazione del sole (gradi per secondo)
 
 	
 	/* ------------------ RENDER LOOP ---------------------------*/
-	while (!glfwWindowShouldClose(window))
-	{
-		std::cout << camera.Position << std::endl << camera.Front << std::endl << std::endl;
+	while (!glfwWindowShouldClose(window)){
 		/* Render here */
 		glClearColor(0.8f, 0.8f, 0.9f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -410,6 +417,8 @@ int main(void)
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+
+		stack.load_identity();
 
 		// Calcolare l'angolo di rotazione del sole
 		dayNight_rotation_angle += (dayNight_rotation_speed * deltaTime);
@@ -445,6 +454,8 @@ int main(void)
 			//rendering depth map del faretto
 			glUseProgram(depth_shader.program);
 
+			lampProjector.view_matrix = glm::lookAt(spotLight.position, spotLight.direction, glm::vec3(0.f, 0.f, 1.f));
+
 			lampProjector.set_projection(lampProjector.view_matrix);
 			glUniformMatrix4fv(depth_shader["uLightSpaceMatrix"], 1, GL_FALSE, &(lampProjector.light_matrix())[0][0]);
 
@@ -470,7 +481,6 @@ int main(void)
 		// Input
 		processInput(window);
 		view = camera.GetViewMatrix();
-		stack.load_identity();
 		//Terrain Rendering
 		glUseProgram(lighting_shader.program);
 		sun.set_uniform(lighting_shader.program); //aggiornamento dei dati del sole che ruota
@@ -480,7 +490,7 @@ int main(void)
 
 		glUniformMatrix4fv(lighting_shader["uView"], 1, GL_FALSE, &view[0][0]);
 		glUniformMatrix4fv(lighting_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
-		glUniformMatrix4fv(lighting_shader["uModel"], 1, GL_FALSE, &stack.m()[0][0]);
+		//glUniformMatrix4fv(lighting_shader["uModel"], 1, GL_FALSE, &stack.m()[0][0]);
 		glUniform3fv(lighting_shader["uViewPos"], 1, &camera.Position[0]);
 
 		//shadowmapping del sole
@@ -524,29 +534,32 @@ int main(void)
 	return 0;
 }
 
-void render_gltf(shader shader, bool isLightShader, std::vector<renderable> obj, box3 bbox, glm::mat4 global_position) {
+glm::mat4 render_gltf(shader shader, bool isLightShader, std::vector<renderable> obj, box3 bbox, glm::mat4 global_position) {
 	// Scala il modello per adattarsi alla scena
 	float scale = 1.f / bbox.diagonal();
 		glm::mat4 scale_box = glm::scale(glm::mat4(1.f), glm::vec3(scale));
 		glm::mat4 center = glm::translate(glm::mat4(1.f), glm::vec3(-bbox.center()));
-		
-			for (unsigned int i = 0; i < obj.size(); ++i) {
-				float height_value = heightmap.heightFunction(bbox.min.x, bbox.min.z, heightmapRep);
+		glm::mat4 global_matrix;
+		for (unsigned int i = 0; i < obj.size(); ++i) {
+			//float height_value = heightmap.heightFunction(bbox.min.x, bbox.min.z, heightmapRep);
+			float height_value = heightmap.heightFunction(obj[i].transform[3][0], obj[i].transform[3][2], heightmapRep);
 
-				float new_y = r_terrain.transform[3][1] + (height_value * heightmapScale);
-				glm::mat4 terrain_level = glm::translate(glm::mat4(1.f), glm::vec3(0.f, new_y, 0.f));
+			//float new_y = r_terrain.transform[3][1] + (height_value * heightmapScale);
+			float new_y = 0.25f + (height_value * heightmapScale);
+			glm::mat4 terrain_level = glm::translate(glm::mat4(1.f), glm::vec3(0.f, new_y, 0.f));
 		
-				obj[i].bind();
-				glm::mat4 global_matrix = global_position *terrain_level* scale_box * center* obj[i].transform;
-				glUniformMatrix4fv(shader["uModel"], 1, GL_FALSE, &(global_matrix)[0][0]);
-				glDrawElements(obj[i]().mode, obj[i]().count, obj[i]().itype, 0);
-			}
+			obj[i].bind();
+			global_matrix = global_position *terrain_level* scale_box * center* obj[i].transform;
+			glUniformMatrix4fv(shader["uModel"], 1, GL_FALSE, &(global_matrix)[0][0]);
+			glDrawElements(obj[i]().mode, obj[i]().count, obj[i]().itype, 0);
+		}
+		return global_matrix;
 }
 
 void renderScene(shader shader, bool isLightShader) {
 	//rendering del terreno
-	if(isLightShader) sand_material.set_shader_uniforms(shader.program);
 	
+	if(isLightShader) sand_material.set_shader_uniforms(shader.program);
 	r_terrain.bind();
 	stack.push();
 		stack.mult(r_terrain.transform);
@@ -562,7 +575,7 @@ void renderScene(shader shader, bool isLightShader) {
 
 	//rendering della street light
 	if (isLightShader) lamp_material.set_shader_uniforms(shader.program);
-	render_gltf(shader, isLightShader,lamp_r, lamp_box, lamp_model_mat);
+	glm::mat4 lamp_global_matrix = render_gltf(shader, isLightShader,lamp_r, lamp_box, lamp_model_mat);
 	check_gl_errors(__LINE__, __FILE__, true);
 }
 
@@ -630,7 +643,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 /* funzione che aggiorna la posizione (valore y) della camera seguendo l'altezza delle dune */
 float updateCameraHeight(float x, float z) {
 	float heightValue = heightmap.heightFunction(x, z, heightmapRep);
-	float new_y = 0.5f + (heightValue * heightmapScale);
+	float new_y = 0.75f + (heightValue * heightmapScale);
 	camera.Position.y = new_y;
 	return new_y;
 }

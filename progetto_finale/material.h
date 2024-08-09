@@ -28,6 +28,9 @@ public:
     GLint roughness_map;
     bool has_roughness_map;
 
+    GLint emissive_map;
+    bool has_emissive_map;
+
     GLint normal_map;
     bool has_normal_map;
 
@@ -37,13 +40,14 @@ public:
     Material(const std::string& material_name)
         : name(material_name), has_heightmap(false), diffuse_factor(1.0f), metallic_factor(0.5f),
         roughness_factor(0.5f), diffuse_map(-1), has_diffuse_map(false), metallic_map(-1),
-        has_metallic_map(false), roughness_map(-1), has_roughness_map(false), normal_map(-1),
+        has_metallic_map(false), roughness_map(-1), has_emissive_map(false), emissive_map(-1) ,has_roughness_map(false), normal_map(-1),
         has_normal_map(false), ao_factor(0.05f), ao_map(-1), has_ao_map(false) {}
 
     virtual void set_shader_uniforms(GLuint shader_program) const {
         if (has_heightmap) {
             glUniform1i(glGetUniformLocation(shader_program, "has_heightmap"), 1);
-        }
+        }else
+            glUniform1i(glGetUniformLocation(shader_program, "has_heightmap"), 0);
 
 
         if(has_diffuse_map){
@@ -69,6 +73,13 @@ public:
         else {
             glUniform1f(glGetUniformLocation(shader_program, "material.roughness_factor"), roughness_factor);
             glUniform1i(glGetUniformLocation(shader_program, "material.has_roughness_map"), 0);
+        }
+
+        if (has_emissive_map) {
+            glUniform1i(glGetUniformLocation(shader_program, "material.emissive_map"), emissive_map);
+            glUniform1i(glGetUniformLocation(shader_program, "material.has_emissive_map"), 1);
+        }else{
+            glUniform1i(glGetUniformLocation(shader_program, "material.has_emissive_map"), 0);
         }
         
         if (has_ao_map) {
@@ -131,7 +142,6 @@ public:
         has_normal_map = true;
         normal_map = _normal_map;
 
-        has_ao_map = false;
         ao_factor = 0.05f;
     }
     void set_shader_uniforms(GLuint shader_program) const override {
@@ -143,21 +153,28 @@ class LampMaterial : public Material {
 public:
     LampMaterial() : Material("lamp_material") {}
 
-    void init(GLint _diffuse_map, GLint _roughness_map, GLint _metallic_map, GLint _normal_map) {
+    void init(GLint _diffuse_map, GLint _roughness_map, GLint _metallic_map, GLint _normal_map, GLint _emissive_map, GLint _ao_map) {
         has_diffuse_map = true;
         diffuse_map = _diffuse_map;
+        diffuse_factor = glm::vec3(0.67f, 0.76f, 0.94f);
 
         has_roughness_map = true;
         roughness_map = _roughness_map;
+        roughness_factor = 0.5f;
 
         has_metallic_map = true;
         metallic_map = _metallic_map;
+        metallic_factor = 0.90f;
 
         has_normal_map = true;
         normal_map = _normal_map;
 
-        has_ao_map = false;
-        ao_factor = 0.05f;
+        has_emissive_map = true;
+        emissive_map = _emissive_map;
+
+        has_ao_map = true;
+        ao_map = _ao_map;
+        ao_factor = 0.005f;
     }
     void set_shader_uniforms(GLuint shader_program) const override {
         Material::set_shader_uniforms(shader_program);
