@@ -410,11 +410,7 @@ int main(void)
 
 	/* ------------------ RENDER LOOP ---------------------------*/
 	while (!glfwWindowShouldClose(window)) {
-		std::system("cls");
-		std::cout << "pos: " << camera.Position << std::endl;
-		std::cout << "dir: " << camera.Front << std::endl;
-
-
+		
 		/* Render here */
 		glClearColor(0.8f, 0.8f, 0.9f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
