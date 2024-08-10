@@ -1,5 +1,5 @@
 # CG24_final_essay
-![alt text](https://github.com/DavideFantasia/CG24_final_essay/blob/main/screenshots/Screenshot%202024-08-10%20013057.png?raw=true)
+![alt text](https://github.com/DavideFantasia/CG24_final_essay/blob/main/screenshots/Screenshot%202024-08-10%20143143.png?raw=true)
 ##
 # Descrizione
 Scena desertica con modelli di un lampione (licenza gratuita) e di un busto del David di Michelangelo creato dal sottoscritto, il terreno è generato in maniera procedurale usando come seed una displacement map (o Height Map). Il motore grafico è scritto in C++ con OpenGL (glfw e glew).
