@@ -6,3 +6,9 @@ Scena desertica con modelli di un lampione (licenza gratuita) e di un busto del 
 È implementato un pbr basato sull'equazione di Cook-Torrance. La scena alterna momenti di giorno a momenti notturni (ciclo giorno/notte)
 # Comandi
 Si naviga nella scena con i controlli WASD e si muove la camera usando il tasto sinistro del mouse, con la rotella del mouse si può zoommare in avanti e indietro. Con i tasti '1' e '2' è possibile cambiare posizione della camera, switchando fra due punti di interesse scelti dall'autore.
+# Dipendenze
+Il progetto si basa sul framework C++: OpenGL e quindi sulle seguenti librerie:
+* glfw
+* glew
+* glm
+* tinygltf
