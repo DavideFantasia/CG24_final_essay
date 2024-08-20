@@ -63,7 +63,7 @@ void processInput(GLFWwindow* window);
 texture heightmap, sandTexture;
 //char heightmap_name[256] = { "./textures/terrain/height_map.png" };
 char heightmap_name[256] = { "./textures/terrain/test_blur.png" };
-char sandTexture_name[256] = { "./textures/terrain/sand_texture.jpg" };
+char sandTexture_name[256] = { "./textures/terrain/sand_texture_tileable.png" };
 
 //texture del busto del david
 texture diffuse_david, roughness_david, metallic_david, normal_david, ao_david, uv_david;
