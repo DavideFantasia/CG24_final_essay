@@ -336,13 +336,13 @@ int main(void)
 
 	/* ------------ light projection ------------ */
 
-	sunProjector.sm_size_x = 4096;
-	sunProjector.sm_size_y = 4096;
+	sunProjector.sm_size_x = 2048;
+	sunProjector.sm_size_y = 2048;
 
 	lampProjector.sm_size_x = 1924;
 	lampProjector.sm_size_y = 1924;
 
-	depth_bias = 0.0009f;
+	depth_bias = 0.005f;
 	distance_light = 10;
 
 	/* ----------- Passaggio Uniform per la creazione del Terrain ----------------*/
@@ -450,8 +450,8 @@ int main(void)
 
 		//condizione per determinare se renderizzare la luce e le ombre del lampione
 		float normalized_angle = 0.5 * (1.0 + glm::cos(glm::radians(fmod(dayNight_rotation_angle, 360.0)) - 3.14159 / 2.0));
-		bool isNight = (normalized_angle > 0.f) && (normalized_angle < 0.47f);
-
+		//maggiore di alba e minore di tramonto
+		bool isNight = (normalized_angle > 0.f) && (normalized_angle < 0.57f);
 		if (isNight) {
 			//rendering depth map del faretto
 			glUseProgram(depth_shader.program);

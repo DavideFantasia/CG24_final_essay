@@ -8,6 +8,7 @@ layout (location = 4) in vec2 aTexCoord;
 out vec2 vTexCoord;
 out vec3 vColor;
 out vec3 vPos; 
+out vec3 vNormal;
 out vec4 vPosSunLightSpace;
 out vec4 vPosLampLightSpace;
 
@@ -25,14 +26,16 @@ uniform mat4 uLampLightSpaceMatrix;
 uniform int has_heightmap; 
 
 float sampleHeight();
+vec3 computeNormal(vec3 pos, vec2 texCoord);
 
 void main(void)
 {
     vec3 newPosition;
+    vec3 newNorm = aNormal;
     if(has_heightmap == 1){
         float height = normalize(texture(uColorImage,aTexCoord*uTextureRep)).r * uHeightScale;
         newPosition = vec3(aPosition.x, aPosition.y+height, aPosition.z);
-        //newPosition = vec3(aPosition.x, aPosition.y + sampleHeight(), aPosition.z);
+        newNorm = computeNormal(newPosition, aTexCoord);
     }else
         newPosition = vec3(aPosition.x, aPosition.y, aPosition.z);
 
@@ -43,7 +46,25 @@ void main(void)
     vPosSunLightSpace = uSunLightSpaceMatrix * vec4(vPos, 1.0);
     vPosLampLightSpace = uLampLightSpaceMatrix * vec4(vPos, 1.0);
 
+    vNormal = newNorm;
     gl_Position = uProj * uView * uModel * vec4(newPosition, 1.0);
+}
+
+
+vec3 computeNormal(vec3 pos, vec2 texCoord) {
+    vec2 texelSize = 1.0 / textureSize(uColorImage, 0); // Dimensione del texel
+    
+    float heightL = texture(uColorImage, texCoord * uTextureRep + vec2(-texelSize.x, 0)).r * uHeightScale;
+    float heightR = texture(uColorImage, texCoord * uTextureRep + vec2(texelSize.x, 0)).r * uHeightScale;
+    float heightD = texture(uColorImage, texCoord * uTextureRep + vec2(0, -texelSize.y)).r * uHeightScale;
+    float heightU = texture(uColorImage, texCoord * uTextureRep + vec2(0, texelSize.y)).r * uHeightScale;
+
+    vec3 normal;
+    normal.x = heightL - heightR;
+    normal.y = aNormal.y + (texture(uColorImage,aTexCoord*uTextureRep)).r * uHeightScale;
+    normal.z = heightD - heightU;
+
+    return normalize(normal);
 }
 
 float sampleHeight(){

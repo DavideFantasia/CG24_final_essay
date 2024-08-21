@@ -5,6 +5,7 @@ out vec4 color;
 in vec2 vTexCoord;
 in vec3 vColor; 
 in vec3 vPos; 
+in vec3 vNormal;
 in vec4 vPosSunLightSpace;
 in vec4 vPosLampLightSpace;
 
@@ -174,9 +175,10 @@ void main(void)
 	vec3 norm; //N
 	if(material.has_normal_map == 1)
 		norm = getNormalFromMap();
-	else
-		norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
-
+	else{
+		//norm = normalize(cross(dFdx(vPos),dFdy(vPos)));
+		norm = vNormal;
+	}
 	//diffuse factor
 	vec3 diffuse;
 	if(material.has_diffuse_map == 1)
@@ -268,7 +270,7 @@ vec3 CalcDirLight(DirLight light, vec3 viewDir, vec3 diffuse, vec3 normal, float
 	// scale light by NdotL
     float NdotL = max(dot(normal, L), 0.0);     
 	
-	float shadow = ShadowCalculation(vPosSunLightSpace, normal, viewDir, 2, uSunShadowMap);
+	float shadow = ShadowCalculation(vPosSunLightSpace, normal, viewDir, 3, uSunShadowMap);
 
 	// add to outgoing radiance Lo
     return (kD * diffuse / PI + specular) * radiance * NdotL * (1.0-shadow);  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
@@ -355,7 +357,6 @@ vec3 CalcSpotLight(SpotLight light, vec3 fragPos, vec3 viewDir, vec3 diffuse, ve
 	// scale light by NdotL
     float NdotL = max(dot(normal, L), 0.0);     
 	
-	//float shadow = ShadowCalculation(vPosLightSpace, normal, viewDir, 2);
 	float shadow = ShadowCalculation(vPosLampLightSpace, normal, viewDir, 2, uLampShadowMap);
 
 	// add to outgoing radiance Lo

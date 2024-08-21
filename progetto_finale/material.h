@@ -107,7 +107,7 @@ public:
     SandTerrainMaterial(): Material("sand_terrain") {
         diffuse_factor = glm::vec3(0.94f, 0.80f, 0.49f);
         metallic_factor = 0.f;
-        roughness_factor = 1.f;
+        roughness_factor = 0.8f;
         ao_factor = 0.05f;
 
         has_diffuse_map = true;
